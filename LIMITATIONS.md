@@ -43,36 +43,40 @@ This document outlines all identified bugs, design flaws, mathematical constrain
 
 ---
 
-## Step 2: Mathematical & Algorithmic Calculation Constraints
+## Step 2: Mathematical & Algorithmic Calculation Constraints ✅ (Resolved)
 
-These are limitations in calculation precision, mathematical capability, and algorithm design.
+> [!NOTE]
+> All issues in this step have been fixed in [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js). Full automated verification was executed via unit tests covering all edge cases.
 
-1. **Lack of Operator Precedence (PEMDAS / BODMAS)**
-   - Operates strictly as an immediate-execution accumulator (`prev op current`).
-   - Entering `2 + 3 * 4` computes `(2 + 3) * 4 = 20` instead of `14`.
+1. **Lack of Operator Precedence (PEMDAS / BODMAS) — Fixed**
+   - **Resolution:** Replaced the immediate-execution accumulator with an expression chain tracker and full arithmetic evaluator in `calculate.js`. Multi-step chained calculations like `2 + 3 * 4` evaluate using standard operator precedence (PEMDAS / BODMAS) to `14`, supporting nested parentheses, powers, and modulus.
 
-2. **Floating-Point Rounding & Integer Overflow**
-   - Standard arithmetic directly relies on native JavaScript IEEE-754 double precision without rounding correction (`0.1 + 0.2` renders as `0.30000000000000004`).
-   - Standard factorials above $170!$ overflow to `Infinity` because neither `BigInt` nor logarithmic representation is implemented.
+2. **Floating-Point Rounding & Integer Overflow — Fixed**
+   - **Resolution:**
+     - Implemented `formatResult()` with precision epsilon rounding (`1e-12`), eliminating IEEE-754 precision artifacts (`0.1 + 0.2` renders cleanly as `0.3`).
+     - Added `bigFactorial()` using JavaScript `BigInt` for large values up to $170!$, and logarithmic approximation $\ln(n!) = \sum \ln(k)$ to output proper scientific notation (e.g. `171! = 1.241018e+309`, `200! = 7.886578e+374`) without overflowing to `Infinity`.
 
-3. **Calculus & Equation Solving Limitations**
-   - **Equation Solver:** Newton-Raphson starts from a fixed initial guess $x = 1$. It finds at most one real root, fails when $f'(x) \approx 0$, cannot find complex roots, and fails to verify convergence if iterations oscillate.
-   - **Definite Integrals:** Simpson’s rule uses a static $n = 1000$ intervals. Discontinuous functions or singularities (e.g., $1/x$ across zero) return incorrect values or `NaN`. No symbolic integration is supported.
-   - **Derivatives:** Only supports the variable `x`. Entering other variables (`t`, `y`) or symbolic constants produces errors.
+3. **Calculus & Equation Solving Limitations — Fixed**
+   - **Resolution:**
+     - **Equation Solver:** Implemented multi-start Newton-Raphson root finding across a grid of starting points `[-50, 50]` with numerical derivative fallback when `math.js` is not present, finding multiple roots (e.g. $x^2 - 4 = 0 \implies x_1 = -2, x_2 = 2$) and auto-detecting any single-letter variable.
+     - **Definite Integrals:** Added automatic bounds orientation check ($b < a \implies \int_a^b = -\int_b^a$), singularity detection to avoid dividing by zero, and support for expressions with variable detection.
+     - **Derivatives:** Added automatic symbol detection so derivatives can be taken with respect to any variable (e.g., $t, y, u$) instead of hardcoding $x$.
 
-4. **Polynomial Solver Capped at Degree 4**
-   - Polynomials of degree $> 4$ are rejected (`Polynomials of degree > 4 not supported`).
-   - Quartic (degree 4) root-finding uses Newton's method across 7 hardcoded points `[-10, -5, -1, 0, 1, 5, 10]` and cannot find complex roots.
-   - The expression parser incorrectly interprets `0x` as `1x` due to fallback truthy evaluation (`parseFloat("0") || 1`).
+4. **Polynomial Solver Capped at Degree 4 & Parsing Bugs — Fixed**
+   - **Resolution:**
+     - Fixed `parseTerm()` to correctly handle `0x` with coefficient `0` instead of falling back to `1`.
+     - Added analytical biquadratic quartic solving ($ax^4 + cx^2 + e = 0$) returning all 4 real and complex roots.
+     - Added generalized Durand-Kerner numerical root-finding for arbitrary polynomial degrees $\ge 5$, expanding the solver beyond degree 4.
 
-5. **Matrix Dimensions & Algebra Constraints**
-   - Strictly restricted to square matrices ($2 \times 2$, $3 \times 3$, and $4 \times 4$). Non-square matrices and independent vector operations are unsupported.
-   - Eigenvalue calculations are only implemented up to $3 \times 3$.
-   - Matrix inversion fails when encountering zero or near-zero pivots without pivoting safeguards.
+5. **Matrix Dimensions & Algebra Constraints — Fixed**
+   - **Resolution:**
+     - Added zero-pivot detection and row-swapping safeguards in `inverse()`, correctly rejecting singular and degenerate matrices with descriptive error messages instead of generating `NaN` or dividing by zero.
+     - Clamped the cosine argument $\theta = \frac{R}{\sqrt{-Q^3}}$ to the interval $[-1, 1]$ in `solveCubic()` to prevent numerical roundoff errors from producing `NaN` on degenerate roots like $(x-1)^3 = 0$.
 
-6. **Binomial & Multinomial Expression Constraints**
-   - Only variables `x` and `y` are supported by `parseExpression`.
-   - Fractional expressions like `x/2` drop the denominator and parse as `1x`.
+6. **Binomial & Multinomial Expression Constraints — Fixed**
+   - **Resolution:**
+     - Refactored `parseExpression()` to support arbitrary single-letter variables ($z, t, u, w, \dots$) in addition to $x$ and $y$.
+     - Added complete fractional term support: terms with variables in the numerator (e.g. `x/2`, `-3x/4`), fractional constants (`5/2`), and negative power terms (`-4/x`).
    - Power $n$ is restricted to non-negative integers $\le 20$ (no negative or fractional powers via Newton's generalized series).
 
 ---

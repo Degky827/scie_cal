@@ -3,6 +3,7 @@
 let currentInput = '0';
 let previousInput = '';
 let operation = null;
+let expressionChain = '';
 let memory = 0;
 let angleMode = 'deg'; // 'deg' or 'rad'
 let history = [];
@@ -119,10 +120,22 @@ function switchMode(mode) {
 }
 
 // Display functions
+// Remove IEEE-754 precision artifacts like 0.1 + 0.2 = 0.30000000000000004
+function formatResult(val) {
+    if (typeof val !== 'number' || isNaN(val)) return 'Error';
+    if (!isFinite(val)) return val > 0 ? 'Infinity' : '-Infinity';
+    const rounded = parseFloat(val.toPrecision(12));
+    return rounded.toString();
+}
+
 function updateDisplay() {
     mainDisplay.textContent = currentInput;
-    if (previousInput && operation) {
+    if (expressionChain) {
+        historyDisplay.textContent = expressionChain;
+    } else if (previousInput && operation) {
         historyDisplay.textContent = `${previousInput} ${operation}`;
+    } else {
+        historyDisplay.textContent = '';
     }
 }
 
@@ -138,13 +151,23 @@ function appendNumber(num) {
 function appendOperator(op) {
     if (currentInput === 'Error') return;
     
-    if (previousInput && operation) {
-        calculate();
+    const opSym = (op === 'mod') ? '%' : op;
+    
+    if (expressionChain) {
+        if (currentInput === '0' && expressionChain.endsWith(' ')) {
+            // Replace trailing operator if user selected another
+            expressionChain = expressionChain.trimEnd().replace(/[\+\-\*/\%\^]$/, opSym) + ' ';
+        } else {
+            expressionChain += `${currentInput} ${opSym} `;
+            currentInput = '0';
+        }
+    } else {
+        expressionChain = `${currentInput} ${opSym} `;
+        currentInput = '0';
     }
     
-    previousInput = currentInput;
+    previousInput = expressionChain;
     operation = op;
-    currentInput = '0';
     updateDisplay();
 }
 
@@ -192,79 +215,41 @@ function evaluateArithmetic(val) {
     }
 }
 
-// Basic operations
+// Basic operations with PEMDAS operator precedence & precision formatting
 function calculate() {
     try {
-        // If an expression with parentheses or operators is entered in currentInput
-        if (!previousInput && currentInput) {
-            if (currentInput.includes('(') || /[+*\/^]/.test(currentInput)) {
-                const evaluated = evaluateArithmetic(currentInput);
-                if (!isNaN(evaluated)) {
-                    addToHistory(currentInput, evaluated);
-                    currentInput = evaluated.toString();
-                    updateDisplay();
-                    return;
-                }
-            }
-        }
-
-        if (!previousInput || !operation) return;
-        
-        let result;
-        const prev = evaluateArithmetic(previousInput);
-        const current = evaluateArithmetic(currentInput);
-        
-        if (isNaN(prev) || isNaN(current)) {
-            const fullExpr = `${previousInput} ${operation} ${currentInput}`;
-            const fullVal = evaluateArithmetic(fullExpr);
-            if (!isNaN(fullVal)) {
-                addToHistory(fullExpr, fullVal);
-                currentInput = fullVal.toString();
-                previousInput = '';
-                operation = null;
-                updateDisplay();
-                return;
-            }
-            throw new Error('Invalid calculation');
+        let fullExpr = '';
+        if (expressionChain) {
+            fullExpr = `${expressionChain} ${currentInput}`.trim();
+        } else if (currentInput) {
+            fullExpr = currentInput.trim();
         }
         
-        switch(operation) {
-            case '+':
-                result = prev + current;
-                break;
-            case '-':
-                result = prev - current;
-                break;
-            case '*':
-                result = prev * current;
-                break;
-            case '/':
-                if (current === 0) throw new Error('Division by zero');
-                result = prev / current;
-                break;
-            case '^':
-                result = Math.pow(prev, current);
-                break;
-            case 'mod':
-                result = prev % current;
-                break;
-            default:
-                return;
-        }
+        if (!fullExpr) return;
         
-        addToHistory(`${previousInput} ${operation} ${currentInput}`, result);
-        currentInput = result.toString();
+        const evaluated = evaluateArithmetic(fullExpr);
+        if (isNaN(evaluated)) throw new Error('Invalid calculation');
+        
+        const formatted = formatResult(evaluated);
+        addToHistory(fullExpr, formatted);
+        
+        currentInput = formatted;
+        expressionChain = '';
         previousInput = '';
         operation = null;
         updateDisplay();
     } catch (error) {
         currentInput = 'Error';
+        expressionChain = '';
+        previousInput = '';
+        operation = null;
         updateDisplay();
     }
 }
 
 function clearAll() {
     currentInput = '0';
+    expressionChain = '';
     previousInput = '';
     operation = null;
     updateDisplay();
@@ -377,11 +362,29 @@ function scientificFunction(func) {
 function factorial(n) {
     if (n < 0 || !Number.isInteger(n)) throw new Error('Invalid input');
     if (n === 0 || n === 1) return 1;
-    let result = 1;
-    for (let i = 2; i <= n; i++) {
-        result *= i;
+    
+    // Use BigInt for exact computation without IEEE-754 precision loss
+    if (n <= 1000) {
+        let res = 1n;
+        for (let i = 2n; i <= BigInt(n); i++) {
+            res *= i;
+        }
+        if (n <= 21) return Number(res);
+        const str = res.toString();
+        if (str.length > 15) {
+            const exp = str.length - 1;
+            const mantissa = parseFloat(str[0] + '.' + str.slice(1, 7));
+            return `${mantissa}e+${exp}`;
+        }
+        return str;
     }
-    return result;
+    
+    // For n > 1000, Stirling approximation in log-space
+    const lnFact = n * Math.log(n) - n + 0.5 * Math.log(2 * Math.PI * n);
+    const log10Fact = lnFact / Math.LN10;
+    const exponent = Math.floor(log10Fact);
+    const mantissa = Math.pow(10, log10Fact - exponent);
+    return `${mantissa.toFixed(4)}e+${exponent}`;
 }
 
 function toggleAngleMode() {
@@ -436,17 +439,33 @@ function calculateDerivative() {
         return;
     }
     
+    if (typeof math === 'undefined') {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Symbolic math library (math.js) is not loaded</span>';
+        return;
+    }
+    
     try {
-        // Parse the function
         const expr = math.parse(input);
-        const derivative = math.derivative(expr, 'x');
         
-        let resultText = `<strong>f'(x) = ${derivative.toString()}</strong>`;
+        // Auto-detect variable in expression (e.g. x, t, y, u)
+        let variable = 'x';
+        if (expr.filter) {
+            const symbols = expr.filter(node => node.isSymbolNode)
+                                .map(n => n.name)
+                                .filter(n => !['pi', 'e', 'E', 'PI'].includes(n));
+            if (symbols.length > 0) variable = symbols[0];
+        }
         
-        if (point) {
-            const scope = { x: parseFloat(point) };
-            const value = derivative.evaluate(scope);
-            resultText += `<br><br>At x = ${point}: <strong>${value.toFixed(6)}</strong>`;
+        const derivative = math.derivative(expr, variable);
+        let resultText = `<strong>d/d${variable} [${input}] = ${derivative.toString()}</strong>`;
+        
+        if (point !== '') {
+            const pointVal = parseFloat(point);
+            if (!isNaN(pointVal)) {
+                const scope = { [variable]: pointVal };
+                const value = derivative.evaluate(scope);
+                resultText += `<br><br>At ${variable} = ${pointVal}: <strong>${Number(value).toFixed(6)}</strong>`;
+            }
         }
         
         resultDiv.innerHTML = resultText;
@@ -457,8 +476,8 @@ function calculateDerivative() {
 
 function calculateIntegral() {
     const input = document.getElementById('integralInput').value;
-    const lower = parseFloat(document.getElementById('integralLower').value);
-    const upper = parseFloat(document.getElementById('integralUpper').value);
+    let lower = parseFloat(document.getElementById('integralLower').value);
+    let upper = parseFloat(document.getElementById('integralUpper').value);
     const resultDiv = document.getElementById('integralResult');
     
     if (!input) {
@@ -472,22 +491,50 @@ function calculateIntegral() {
     }
     
     try {
-        // Numerical integration using Simpson's rule
-        const f = math.compile(input);
-        const n = 1000; // Number of intervals
-        const h = (upper - lower) / n;
-        let sum = f.evaluate({ x: lower }) + f.evaluate({ x: upper });
-        
-        for (let i = 1; i < n; i++) {
-            const x = lower + i * h;
-            const weight = i % 2 === 0 ? 2 : 4;
-            sum += weight * f.evaluate({ x: x });
+        let sign = 1;
+        if (lower > upper) {
+            const tmp = lower;
+            lower = upper;
+            upper = tmp;
+            sign = -1;
         }
         
-        const result = (h / 3) * sum;
+        const varMatch = input.match(/[a-zA-Z]/);
+        const variable = varMatch ? varMatch[0] : 'x';
+        
+        let f;
+        if (typeof math !== 'undefined' && math.compile) {
+            f = math.compile(input);
+        }
+        const evalF = (val) => {
+            if (f) return f.evaluate({ [variable]: val });
+            return evaluateFunction(input, val);
+        };
+        
+        const n = 1000;
+        const h = (upper - lower) / n;
+        const fLower = evalF(lower);
+        const fUpper = evalF(upper);
+        
+        if (!isFinite(fLower) || !isFinite(fUpper)) {
+            throw new Error('Integrand is undefined or infinite at the boundary points');
+        }
+        
+        let sum = fLower + fUpper;
+        for (let i = 1; i < n; i++) {
+            const x = lower + i * h;
+            const fx = evalF(x);
+            if (!isFinite(fx)) {
+                throw new Error(`Singularity or discontinuity encountered near ${variable} = ${x.toFixed(4)}`);
+            }
+            const weight = i % 2 === 0 ? 2 : 4;
+            sum += weight * fx;
+        }
+        
+        const result = sign * (h / 3) * sum;
         
         resultDiv.innerHTML = `
-            <strong>∫ ${input} dx from ${lower} to ${upper}</strong>
+            <strong>∫ ${input} d${variable} from ${sign === -1 ? upper : lower} to ${sign === -1 ? lower : upper}</strong>
             <br><br>
             Result: <strong>${result.toFixed(6)}</strong>
         `;
@@ -506,7 +553,6 @@ function solveEquation() {
     }
     
     try {
-        // Parse equation (assuming format: expression = 0)
         let equation = input.replace(/\s/g, '');
         if (!equation.includes('=')) {
             equation += '=0';
@@ -515,34 +561,76 @@ function solveEquation() {
         const [left, right] = equation.split('=');
         const expr = `${left}-(${right || '0'})`;
         
-        // Use Newton's method for numerical solution
-        const f = math.compile(expr);
-        const df = math.derivative(math.parse(expr), 'x');
-        
-        let x = 1; // Initial guess
-        const maxIterations = 100;
-        const tolerance = 1e-10;
-        
-        for (let i = 0; i < maxIterations; i++) {
-            const fx = f.evaluate({ x: x });
-            const dfx = df.evaluate({ x: x });
-            
-            if (Math.abs(fx) < tolerance) break;
-            if (Math.abs(dfx) < tolerance) throw new Error('Derivative too small');
-            
-            x = x - fx / dfx;
+        const varMatch = expr.match(/[a-zA-Z]/);
+        const variable = varMatch ? varMatch[0] : 'x';
+
+        let f, df;
+        if (typeof math !== 'undefined' && typeof math.compile === 'function') {
+            f = math.compile(expr);
+            try {
+                df = math.derivative(math.parse(expr), variable);
+            } catch (de) {
+                df = null;
+            }
         }
         
-        // Verify solution
-        const verification = f.evaluate({ x: x });
+        const evalF = (xVal) => {
+            if (f) return f.evaluate({ [variable]: xVal });
+            return evaluateFunction(expr, xVal);
+        };
         
-        resultDiv.innerHTML = `
-            <strong>Solution:</strong>
-            <br><br>
-            x ≈ <strong>${x.toFixed(6)}</strong>
-            <br><br>
-            <small>Verification: f(${x.toFixed(6)}) ≈ ${verification.toExponential(2)}</small>
-        `;
+        const evalDf = (xVal) => {
+            if (df) return df.evaluate({ [variable]: xVal });
+            const h = 1e-6;
+            return (evalF(xVal + h) - evalF(xVal - h)) / (2 * h);
+        };
+        
+        const starts = [-50, -20, -10, -5, -2, -1, -0.5, 0, 0.5, 1, 2, 5, 10, 20, 50];
+        const foundRoots = [];
+        const tolerance = 1e-8;
+        const maxIterations = 80;
+        
+        for (const start of starts) {
+            let x = start;
+            for (let iter = 0; iter < maxIterations; iter++) {
+                try {
+                    const fx = evalF(x);
+                    const dfx = evalDf(x);
+                    if (Math.abs(fx) < tolerance) {
+                        if (isFinite(x)) {
+                            const rounded = Math.round(x * 1e6) / 1e6;
+                            if (!foundRoots.some(r => Math.abs(r - rounded) < 1e-4)) {
+                                foundRoots.push(rounded);
+                            }
+                        }
+                        break;
+                    }
+                    if (Math.abs(dfx) < 1e-12) {
+                        x += 0.25;
+                        continue;
+                    }
+                    const step = fx / dfx;
+                    if (!isFinite(step)) break;
+                    x = x - step;
+                    if (Math.abs(x) > 1e8) break;
+                } catch (e) {
+                    break;
+                }
+            }
+        }
+        
+        foundRoots.sort((a, b) => a - b);
+        
+        if (foundRoots.length > 0) {
+            let rootsHTML = `<strong>Solution${foundRoots.length > 1 ? 's' : ''}:</strong><br><br>`;
+            foundRoots.forEach((root, idx) => {
+                const verif = evalF(root);
+                rootsHTML += `${variable}${foundRoots.length > 1 ? `<sub>${idx + 1}</sub>` : ''} ≈ <strong>${root.toFixed(6)}</strong> <small>(f ≈ ${verif.toExponential(2)})</small><br>`;
+            });
+            resultDiv.innerHTML = rootsHTML;
+        } else {
+            resultDiv.innerHTML = `<span style="color: var(--warning)">No real solutions found in domain [-50, 50]. The equation may have complex roots or no solution.</span>`;
+        }
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${error.message}</span>`;
     }
@@ -685,18 +773,7 @@ document.head.appendChild(style);
 
 // Helper function for large factorials using Stirling's approximation when needed
 function bigFactorial(n) {
-    if (n < 0) throw new Error('Factorial undefined for negative numbers');
-    if (n === 0 || n === 1) return 1;
-    if (n > 170) {
-        // Use Stirling's approximation for very large numbers
-        return Math.sqrt(2 * Math.PI * n) * Math.pow(n / Math.E, n);
-    }
-    
-    let result = 1;
-    for (let i = 2; i <= n; i++) {
-        result *= i;
-    }
-    return result;
+    return factorial(n);
 }
 
 // Permutation P(n,r) = n! / (n-r)!
@@ -811,67 +888,75 @@ function setBinomialMode(mode) {
 }
 
 // Parse expression to extract coefficient and power
-function parseExpression(expr) {
+function parseSingleBinomialTerm(expr) {
     expr = expr.trim();
+    if (!expr) return { coeff: 0, power: 0, variable: '' };
     
-    // Handle simple cases
-    if (expr === 'x') return { coeff: 1, power: 1, variable: 'x' };
-    if (expr === 'y') return { coeff: 1, power: 1, variable: 'y' };
-    if (expr === '-x') return { coeff: -1, power: 1, variable: 'x' };
-    if (expr === '-y') return { coeff: -1, power: 1, variable: 'y' };
-    if (!isNaN(parseFloat(expr))) return { coeff: parseFloat(expr), power: 0, variable: '' };
-    
-    // Handle fractions like 4/x, -3/x^2, 2/y
-    if (expr.includes('/')) {
-        const parts = expr.split('/');
-        const numerator = parseFloat(parts[0]) || 1;
-        const denominator = parts[1].trim();
-        
-        if (denominator === 'x') {
-            return { coeff: numerator, power: -1, variable: 'x' };
-        } else if (denominator === 'y') {
-            return { coeff: numerator, power: -1, variable: 'y' };
-        } else if (denominator.includes('^')) {
-            const match = denominator.match(/([xy])\^(-?\d+)/);
-            if (match) {
-                return { coeff: numerator, power: -parseInt(match[2]), variable: match[1] };
-            }
-        }
+    if (!isNaN(Number(expr))) {
+        return { coeff: parseFloat(expr), power: 0, variable: '' };
     }
     
-    // Handle expressions like 2x, -3x, x^2, 2x^3, 3y, -2y^2
+    const varMatch = expr.match(/[a-zA-Z]/);
+    if (!varMatch) {
+        return { coeff: parseFloat(expr) || 0, power: 0, variable: '' };
+    }
+    
+    const variable = varMatch[0];
+    
+    if (expr === variable || expr === `+${variable}`) return { coeff: 1, power: 1, variable };
+    if (expr === `-${variable}`) return { coeff: -1, power: 1, variable };
+    
+    let power = 1;
+    const powerRegex = new RegExp(`${variable}\\^(-?\\d+)`);
+    const powerMatch = expr.match(powerRegex);
+    if (powerMatch) {
+        power = parseInt(powerMatch[1]);
+    } else if (!expr.includes(variable)) {
+        power = 0;
+    }
+    
     let coeff = 1;
-    let power = 0;
-    let variable = '';
-    
-    // Extract coefficient - fix the regex to handle negative signs properly
-    const coeffMatch = expr.match(/^(-?\d*\.?\d*)/);
-    if (coeffMatch && coeffMatch[1] !== '' && coeffMatch[1] !== '-') {
-        coeff = parseFloat(coeffMatch[1]);
-    } else if (coeffMatch && coeffMatch[1] === '-') {
-        coeff = -1;
-    }
-    
-    // Extract variable and power - support both x and y
-    if (expr.includes('x')) {
-        variable = 'x';
-        const powerMatch = expr.match(/x\^(-?\d+)/);
-        if (powerMatch) {
-            power = parseInt(powerMatch[1]);
-        } else if (expr.includes('x')) {
-            power = 1;
-        }
-    } else if (expr.includes('y')) {
-        variable = 'y';
-        const powerMatch = expr.match(/y\^(-?\d+)/);
-        if (powerMatch) {
-            power = parseInt(powerMatch[1]);
-        } else if (expr.includes('y')) {
-            power = 1;
-        }
+    const coeffRegex = new RegExp(`^([+-]?\\d*\\.?\\d*)\\s*\\*?\\s*${variable}`);
+    const coeffMatch = expr.match(coeffRegex);
+    if (coeffMatch) {
+        const cStr = coeffMatch[1];
+        if (cStr === '' || cStr === '+') coeff = 1;
+        else if (cStr === '-') coeff = -1;
+        else coeff = parseFloat(cStr);
     }
     
     return { coeff, power, variable };
+}
+
+function parseExpression(expr) {
+    expr = expr.trim();
+    if (!expr) return { coeff: 0, power: 0, variable: '' };
+    
+    if (expr.includes('/')) {
+        const parts = expr.split('/');
+        const numPart = parts[0].trim();
+        const denPart = parts[1].trim();
+        
+        const numParsed = parseSingleBinomialTerm(numPart);
+        const denParsed = parseSingleBinomialTerm(denPart);
+        
+        const coeff = numParsed.coeff / denParsed.coeff;
+        
+        if (numParsed.variable && !denParsed.variable) {
+            return { coeff, power: numParsed.power, variable: numParsed.variable };
+        }
+        if (!numParsed.variable && denParsed.variable) {
+            return { coeff, power: -denParsed.power, variable: denParsed.variable };
+        }
+        if (numParsed.variable && denParsed.variable && numParsed.variable === denParsed.variable) {
+            return { coeff, power: numParsed.power - denParsed.power, variable: numParsed.variable };
+        }
+        if (!numParsed.variable && !denParsed.variable) {
+            return { coeff, power: 0, variable: '' };
+        }
+    }
+    
+    return parseSingleBinomialTerm(expr);
 }
 
 // Calculate Binomial Expansion with enhanced functionality
@@ -2187,8 +2272,11 @@ function inverse(matrix) {
         // Swap rows
         [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
         
-        // Make diagonal element 1
+        // Make diagonal element 1 with singularity / pivot safeguard
         const pivot = augmented[i][i];
+        if (Math.abs(pivot) < 1e-12) {
+            throw new Error('Matrix is singular or ill-conditioned (zero pivot encountered)');
+        }
         for (let j = 0; j < 2 * n; j++) {
             augmented[i][j] /= pivot;
         }
@@ -2472,7 +2560,9 @@ function solveCubic(a, b, c, d) {
     } else {
         // Three real roots
         const rho = Math.sqrt(-(p/3)*(p/3)*(p/3));
-        const theta = Math.acos(-q/(2*rho));
+        const ratio = -q / (2 * rho);
+        const clampedRatio = Math.max(-1, Math.min(1, isNaN(ratio) ? 0 : ratio));
+        const theta = Math.acos(clampedRatio);
         
         const root1 = 2 * Math.cbrt(rho) * Math.cos(theta/3) - b/(3*a);
         const root2 = 2 * Math.cbrt(rho) * Math.cos((theta + 2*Math.PI)/3) - b/(3*a);
@@ -4452,34 +4542,34 @@ function parseFromExpression() {
         throw new Error('Please enter a polynomial expression');
     }
     
-    // Simple parser for polynomial expressions
-    const coefficients = [0, 0, 0, 0, 0]; // Support up to degree 4
-    let maxDegree = 0;
-    
-    // Clean the expression
-    let cleanExpr = expression.replace(/\s/g, '').toLowerCase();
-    cleanExpr = cleanExpr.replace(/\*\*/g, '^'); // Convert ** to ^
-    
-    // Split by + and - while keeping the signs
+    let cleanExpr = expression.replace(/\s/g, '').toLowerCase().replace(/\*\*/g, '^');
     const terms = cleanExpr.split(/(?=[+-])/).filter(term => term.length > 0);
     
-    for (let term of terms) {
-        const { coeff, power } = parseTerm(term);
-        coefficients[4 - power] += coeff; // Store in reverse order (highest degree first)
-        maxDegree = Math.max(maxDegree, power);
+    const parsedTerms = terms.map(term => parseTerm(term));
+    let maxDegree = 0;
+    parsedTerms.forEach(t => {
+        if (t.power > maxDegree) maxDegree = t.power;
+    });
+    
+    const coefficients = new Array(maxDegree + 1).fill(0);
+    parsedTerms.forEach(t => {
+        coefficients[maxDegree - t.power] += t.coeff;
+    });
+    
+    let firstNonZero = coefficients.findIndex(c => c !== 0);
+    if (firstNonZero === -1) {
+        return { coefficients: [0], degree: 0 };
     }
+    const trimmedCoeffs = coefficients.slice(firstNonZero);
+    const actualDegree = trimmedCoeffs.length - 1;
     
-    // Trim leading zeros
-    const trimmedCoeffs = coefficients.slice(4 - maxDegree);
-    
-    return { coefficients: trimmedCoeffs, degree: maxDegree };
+    return { coefficients: trimmedCoeffs, degree: actualDegree };
 }
 
 // Parse individual term
 function parseTerm(term) {
     term = term.trim();
     
-    // Handle signs
     let sign = 1;
     if (term.startsWith('+')) {
         term = term.substring(1);
@@ -4488,28 +4578,25 @@ function parseTerm(term) {
         term = term.substring(1);
     }
     
-    // Default values
     let coeff = 1;
     let power = 0;
     
     if (term.includes('x')) {
-        // Extract coefficient
         const coeffMatch = term.match(/^([+-]?\d*\.?\d*)/);
-        if (coeffMatch && coeffMatch[1] !== '') {
-            coeff = parseFloat(coeffMatch[1]) || 1;
+        if (coeffMatch && coeffMatch[1] !== '' && coeffMatch[1] !== '+' && coeffMatch[1] !== '-') {
+            const parsed = parseFloat(coeffMatch[1]);
+            coeff = isNaN(parsed) ? 1 : parsed;
         }
         
-        // Extract power
         if (term.includes('^')) {
             const powerMatch = term.match(/x\^(\d+)/);
             if (powerMatch) {
                 power = parseInt(powerMatch[1]);
             }
-        } else if (term.includes('x')) {
+        } else {
             power = 1;
         }
     } else {
-        // Constant term
         coeff = parseFloat(term) || 0;
         power = 0;
     }
@@ -4627,7 +4714,8 @@ function findPolynomialRoots(polynomial) {
         case 4:
             return solveQuartic(coefficients);
         default:
-            throw new Error('Polynomials of degree > 4 not supported');
+            // Support degree > 4 using robust multi-start numerical root search
+            return findRootsNumerically(coefficients, degree);
     }
 }
 
@@ -4669,7 +4757,30 @@ function solveQuadratic(coeffs) {
 
 // Solve quartic equation (simplified approach)
 function solveQuartic(coeffs) {
-    // For now, use numerical methods for quartic
+    const [a, b, c, d, e] = coeffs;
+    // Check if biquadratic: ax^4 + cx^2 + e = 0 (b === 0 and d === 0)
+    if (Math.abs(b) < 1e-12 && Math.abs(d) < 1e-12) {
+        const quadRoots = solveQuadratic([a, c, e]);
+        const roots = [];
+        quadRoots.forEach(u => {
+            if (typeof u === 'number') {
+                if (u >= 0) {
+                    roots.push(Math.sqrt(u), -Math.sqrt(u));
+                } else {
+                    const im = Math.sqrt(-u);
+                    roots.push({ real: 0, imag: im }, { real: 0, imag: -im });
+                }
+            } else if (u && typeof u === 'object') {
+                const r = Math.hypot(u.real, u.imag);
+                const theta = Math.atan2(u.imag, u.real);
+                const sqrtR = Math.sqrt(r);
+                const rootReal = sqrtR * Math.cos(theta / 2);
+                const rootImag = sqrtR * Math.sin(theta / 2);
+                roots.push({ real: rootReal, imag: rootImag }, { real: -rootReal, imag: -rootImag });
+            }
+        });
+        return roots;
+    }
     return findRootsNumerically(coeffs, 4);
 }
 
