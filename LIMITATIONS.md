@@ -81,25 +81,32 @@ This document outlines all identified bugs, design flaws, mathematical constrain
 
 ---
 
-## Step 3: Security, Input Validation & Keyboard Handling Vulnerabilities
+## Step 3: Security, Input Validation & Keyboard Handling Vulnerabilities ✅ (Resolved)
 
-These are flaws related to unsanitized execution, injection risks, and event capture issues.
+> [!NOTE]
+> All security, input validation, and keyboard event vulnerabilities have been fixed in [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js) and verified via automated injection and regression tests.
 
-1. **Unsafe Math String Evaluation via `eval()`**
-   - **File & Location:** [`calculate.js` (Line 6756)](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js#L6756)
-   - Function expressions entered into the grapher are evaluated using native `eval(expr)`, exposing the app to arbitrary JavaScript execution.
+1. **Unsafe Math String Evaluation via `eval()` & Script Injection — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Replaced open string evaluation with two-layer sandboxed evaluation:
+     - `evaluateArithmetic()` enforces a strict whitelist of safe numeric arithmetic characters `[0-9+\-*/%^().\s eE]`, rejecting all keywords, statements, or property accesses.
+     - `evaluateFunction()` parses user function expressions against a strict whitelist of allowed mathematical identifiers (`sin`, `cos`, `tan`, `sqrt`, `x`, `t`, `pi`, `e`, etc.). It blocks property access (`.`, `[]`), semicolons, quotes, and masks globals (`window`, `document`, `globalThis` set to `undefined`), completely preventing arbitrary JavaScript execution.
 
-2. **DOM-based Cross-Site Scripting (XSS)**
-   - **File & Location:** [`calculate.js` (Lines 522–527)](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js#L522-L527)
-   - Calculation history and equation results are written directly to `innerHTML` without HTML entity encoding or DOM sanitization (`historyList.innerHTML = ... ${item.expression}`).
+2. **DOM-based Cross-Site Scripting (XSS) — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Implemented `escapeHTML()` entity encoder and applied it to all dynamic HTML insertions:
+     - History list: `escapeHTML(item.expression)` and `escapeHTML(item.result)`.
+     - Graph function list: `escapeHTML(func.expression)` and `escapeHTML(func.color)`.
+     - GPA course breakdown: `escapeHTML(course.name)` and `escapeHTML(course.grade)`.
+     - Calculus, equation results, and dynamic error messages are safely sanitized before being inserted into `innerHTML`.
 
-3. **Global Keystroke Listener Hijacking Form Inputs**
-   - **File & Location:** [`calculate.js` (Lines 606–616)](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js#L606-L616)
-   - The `keydown` listener on `document` fails to check `event.target.tagName`.
-   - Typing numbers, pressing `Backspace`, or hitting `Enter` inside any text input field (in Calculus, Polynomial, Matrix, or GPA mode) simultaneously mutates and calculates the basic calculator display in the background.
+3. **Global Keystroke Listener Hijacking Form Inputs — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Added an event target filter (`e.target.tagName === 'INPUT' || 'TEXTAREA' || 'SELECT' || e.target.isContentEditable`) in the document `keydown` listener. When users type inside any text or number field across Polynomial, Calculus, Matrix, or GPA modules, the global basic calculator shortcuts do not hijack the keys or corrupt the calculator display.
 
-4. **Missing Decimal Point Prevention**
-   - `appendNumber('.')` does not verify if a decimal point already exists in `currentInput`, allowing invalid inputs such as `1.2.3.4`.
+4. **Missing Decimal Point Prevention — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Updated `appendNumber('.')` to check `currentInput.includes('.')`. Repeated clicks on `.` or typing `.` when a decimal point is already present in the current number are ignored, preventing malformed inputs like `1.2.3.4`. If pressed on empty/initial display, it automatically formats as `0.`.
 
 ---
 

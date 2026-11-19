@@ -8,6 +8,17 @@ let memory = 0;
 let angleMode = 'deg'; // 'deg' or 'rad'
 let history = [];
 
+// HTML sanitization helper to prevent DOM XSS
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // Display elements
 const mainDisplay = document.getElementById('mainDisplay');
 const historyDisplay = document.getElementById('historyDisplay');
@@ -140,10 +151,20 @@ function updateDisplay() {
 }
 
 function appendNumber(num) {
-    if (currentInput === '0' || currentInput === 'Error') {
-        currentInput = num;
+    if (num === '.') {
+        if (currentInput === '0' || currentInput === 'Error' || !currentInput) {
+            currentInput = '0.';
+        } else if (currentInput.includes('.')) {
+            return; // Prevent duplicate decimal points
+        } else {
+            currentInput += '.';
+        }
     } else {
-        currentInput += num;
+        if (currentInput === '0' || currentInput === 'Error') {
+            currentInput = num;
+        } else {
+            currentInput += num;
+        }
     }
     updateDisplay();
 }
@@ -200,16 +221,21 @@ function evaluateArithmetic(val) {
     if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(val)) {
         return parseFloat(val);
     }
+
+    // Security check: Only allow safe numeric arithmetic tokens
+    if (!/^[0-9+\-*/%^().\s eE]+$/.test(val)) {
+        return NaN;
+    }
     
     try {
-        if (typeof math !== 'undefined' && math.evaluate) {
-            const res = math.evaluate(val);
-            return typeof res === 'number' ? res : (res && res.valueOf ? Number(res.valueOf()) : NaN);
-        }
         const sanitized = val.replace(/\^/g, '**');
-        const fn = new Function('"use strict"; return (' + sanitized + ');');
-        const res = fn();
-        return typeof res === 'number' ? res : NaN;
+        // Double check no unauthorized letters remain (other than exponent notation)
+        if (/[a-zA-Z_$]/.test(sanitized.replace(/[eE][+-]?\d+/g, ''))) {
+            return NaN;
+        }
+        const fn = new Function('window', 'document', 'globalThis', '"use strict"; return (' + sanitized + ');');
+        const res = fn(undefined, undefined, undefined);
+        return typeof res === 'number' && isFinite(res) ? res : NaN;
     } catch (e) {
         return NaN;
     }
@@ -457,20 +483,20 @@ function calculateDerivative() {
         }
         
         const derivative = math.derivative(expr, variable);
-        let resultText = `<strong>d/d${variable} [${input}] = ${derivative.toString()}</strong>`;
+        let resultText = `<strong>d/d${escapeHTML(variable)} [${escapeHTML(input)}] = ${escapeHTML(derivative.toString())}</strong>`;
         
         if (point !== '') {
             const pointVal = parseFloat(point);
             if (!isNaN(pointVal)) {
                 const scope = { [variable]: pointVal };
                 const value = derivative.evaluate(scope);
-                resultText += `<br><br>At ${variable} = ${pointVal}: <strong>${Number(value).toFixed(6)}</strong>`;
+                resultText += `<br><br>At ${escapeHTML(variable)} = ${pointVal}: <strong>${Number(value).toFixed(6)}</strong>`;
             }
         }
         
         resultDiv.innerHTML = resultText;
     } catch (error) {
-        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${error.message}</span>`;
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
     }
 }
 
@@ -534,12 +560,12 @@ function calculateIntegral() {
         const result = sign * (h / 3) * sum;
         
         resultDiv.innerHTML = `
-            <strong>∫ ${input} d${variable} from ${sign === -1 ? upper : lower} to ${sign === -1 ? lower : upper}</strong>
+            <strong>∫ ${escapeHTML(input)} d${escapeHTML(variable)} from ${escapeHTML(sign === -1 ? upper : lower)} to ${escapeHTML(sign === -1 ? lower : upper)}</strong>
             <br><br>
             Result: <strong>${result.toFixed(6)}</strong>
         `;
     } catch (error) {
-        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${error.message}</span>`;
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
     }
 }
 
@@ -625,14 +651,14 @@ function solveEquation() {
             let rootsHTML = `<strong>Solution${foundRoots.length > 1 ? 's' : ''}:</strong><br><br>`;
             foundRoots.forEach((root, idx) => {
                 const verif = evalF(root);
-                rootsHTML += `${variable}${foundRoots.length > 1 ? `<sub>${idx + 1}</sub>` : ''} ≈ <strong>${root.toFixed(6)}</strong> <small>(f ≈ ${verif.toExponential(2)})</small><br>`;
+                rootsHTML += `${escapeHTML(variable)}${foundRoots.length > 1 ? `<sub>${idx + 1}</sub>` : ''} ≈ <strong>${root.toFixed(6)}</strong> <small>(f ≈ ${verif.toExponential(2)})</small><br>`;
             });
             resultDiv.innerHTML = rootsHTML;
         } else {
             resultDiv.innerHTML = `<span style="color: var(--warning)">No real solutions found in domain [-50, 50]. The equation may have complex roots or no solution.</span>`;
         }
     } catch (error) {
-        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${error.message}</span>`;
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
     }
 }
 
@@ -653,6 +679,7 @@ function addToHistory(expression, result) {
 
 function renderHistory() {
     const historyList = document.getElementById('historyList');
+    if (!historyList) return;
     
     if (history.length === 0) {
         historyList.innerHTML = '<p class="no-history">No calculations yet</p>';
@@ -661,8 +688,8 @@ function renderHistory() {
     
     historyList.innerHTML = history.map((item, index) => `
         <div class="history-item" onclick="loadFromHistory(${index})">
-            <div class="history-expression">${item.expression}</div>
-            <div class="history-result">= ${item.result}</div>
+            <div class="history-expression">${escapeHTML(item.expression)}</div>
+            <div class="history-result">= ${escapeHTML(item.result)}</div>
         </div>
     `).join('');
 }
@@ -744,15 +771,27 @@ function showNotification(message) {
 
 // Keyboard support
 document.addEventListener('keydown', (e) => {
+    // Prevent capturing input when user is typing inside form input fields, textareas, or selects
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) {
+        return;
+    }
+
     if (e.key >= '0' && e.key <= '9') appendNumber(e.key);
     else if (e.key === '.') appendNumber('.');
     else if (e.key === '+') appendOperator('+');
     else if (e.key === '-') appendOperator('-');
     else if (e.key === '*') appendOperator('*');
     else if (e.key === '/') appendOperator('/');
-    else if (e.key === 'Enter') calculate();
+    else if (e.key === 'Enter') {
+        e.preventDefault();
+        calculate();
+    }
     else if (e.key === 'Escape') clearAll();
-    else if (e.key === 'Backspace') backspace();
+    else if (e.key === 'Backspace') {
+        e.preventDefault();
+        backspace();
+    }
 });
 
 // Add animation styles
@@ -4205,8 +4244,8 @@ function updateGPADisplay(gpa, totalCredits, totalQualityPoints, courseData, gra
         breakdownHTML += `
             <div class="course-breakdown-item">
                 <div class="course-info">
-                    <strong>${course.name}</strong>
-                    <span class="course-details">${course.credits} credits • Grade: ${course.grade} (${course.gradePoints})${percentageInfo}</span>
+                    <strong>${escapeHTML(course.name)}</strong>
+                    <span class="course-details">${course.credits} credits • Grade: ${escapeHTML(course.grade)} (${course.gradePoints})${percentageInfo}</span>
                 </div>
                 <div class="quality-points">${course.qualityPoints.toFixed(2)} QP</div>
             </div>
@@ -6178,14 +6217,44 @@ function addFunctionToGraph() {
     }
 }
 
-// Evaluate mathematical function
-function evaluateFunction(expression, x) {
+// Whitelist of allowed identifier tokens in user expressions
+const SAFE_MATH_IDENTIFIERS = new Set([
+    'x', 't', 'y', 'u', 'v', 'z',
+    'pi', 'PI', 'e', 'E',
+    'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+    'sec', 'csc', 'cot',
+    'ln', 'log', 'log10', 'log2', 'exp',
+    'sqrt', 'cbrt', 'abs', 'floor', 'ceil', 'round'
+]);
+
+// Evaluate mathematical function safely without code injection risks
+function evaluateFunction(expression, x, variableName = 'x') {
     try {
+        let expr = String(expression).trim();
+        if (!expr) return NaN;
+
+        // Disallow dangerous syntax: property access, indexing, assignments, semicolons, backticks, quotes
+        if (/[;`'"\\\[\]{}]/.test(expr)) {
+            throw new Error('Disallowed characters in expression');
+        }
+        if (/\.\s*[a-zA-Z_$]/.test(expr)) {
+            throw new Error('Property access is not allowed');
+        }
+
+        // Check all identifiers against whitelist
+        const identifiers = expr.match(/[a-zA-Z_$][a-zA-Z0-9_$]*/g) || [];
+        for (const id of identifiers) {
+            if (!SAFE_MATH_IDENTIFIERS.has(id)) {
+                throw new Error('Unknown or forbidden identifier: ' + id);
+            }
+        }
+
         const angleMode = document.getElementById('graphAngleMode')?.value || 'radians';
         const isDeg = (angleMode === 'degrees' || angleMode === 'deg');
 
         const scope = {
             x: Number(x),
+            [variableName]: Number(x),
             pi: Math.PI, PI: Math.PI,
             e: Math.E, E: Math.E,
             sin: (u) => isDeg ? Math.sin(u * Math.PI / 180) : Math.sin(u),
@@ -6210,7 +6279,6 @@ function evaluateFunction(expression, x) {
             round: Math.round
         };
 
-        let expr = String(expression).trim();
         expr = expr.replace(/\^/g, '**');
 
         // Implicit multiplication:
@@ -6222,9 +6290,10 @@ function evaluateFunction(expression, x) {
         const paramNames = Object.keys(scope);
         const paramValues = Object.values(scope);
 
-        const fn = new Function(...paramNames, '"use strict"; return (' + expr + ');');
-        const val = fn(...paramValues);
-        return typeof val === 'number' ? val : NaN;
+        // Mask global scope so code execution cannot reach window, document, or globalThis
+        const fn = new Function('window', 'document', 'globalThis', ...paramNames, '"use strict"; return (' + expr + ');');
+        const val = fn(undefined, undefined, undefined, ...paramValues);
+        return typeof val === 'number' && isFinite(val) ? val : (isNaN(val) ? NaN : (val > 0 ? Infinity : -Infinity));
     } catch (error) {
         throw new Error('Invalid expression: ' + error.message);
     }
@@ -6638,10 +6707,10 @@ function updateFunctionList() {
     let listHTML = '';
     activeFunctions.forEach((func, index) => {
         listHTML += `
-            <div class="function-item" style="border-left: 4px solid ${func.color}">
+            <div class="function-item" style="border-left: 4px solid ${escapeHTML(func.color)}">
                 <div class="function-info">
-                    <span class="function-expression">${func.expression}</span>
-                    <span class="function-type">(${func.type})</span>
+                    <span class="function-expression">${escapeHTML(func.expression)}</span>
+                    <span class="function-type">(${escapeHTML(func.type)})</span>
                 </div>
                 <div class="function-controls">
                     <button class="btn btn-toggle ${func.visible ? 'active' : ''}" onclick="toggleFunction(${func.id})">
