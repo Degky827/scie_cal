@@ -4212,6 +4212,7 @@ body {
     cursor: crosshair;
     display: block;
     margin: 0 auto;
+    touch-action: none;
 }
 
 .graph-info {
@@ -4885,6 +4886,7 @@ body {
     cursor: crosshair;
     display: block;
     margin: 0 auto;
+    touch-action: none;
 }
 
 .graph-coordinates {

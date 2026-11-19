@@ -110,22 +110,26 @@ This document outlines all identified bugs, design flaws, mathematical constrain
 
 ---
 
-## Step 4: Graphing, Visual Rendering & Touch/Mobile Limitations
+## Step 4: Graphing, Visual Rendering & Touch/Mobile Limitations ✅ (Resolved)
 
-These are issues concerning canvas rendering accuracy, responsive scaling, and interaction.
+> [!NOTE]
+> All graphing, responsive scaling, touch interaction, and asymptote issues have been resolved across [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js) and [`calculate.css`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.css).
 
-1. **Canvas Coordinate Desynchronization on Small Displays**
-   - In `initializeAdvancedGraphInteraction` (lines 7077–7094), cursor coordinates are taken from `event.clientX - rect.left` without normalizing against `canvas.width / rect.width`.
-   - When the canvas is scaled down by CSS on mobile or tablet screens, hover coordinates desynchronize completely from the visual graph.
+1. **Canvas Coordinate Desynchronization on Small Displays — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Updated both `initializeAdvancedGraphInteraction()` and `initializeGraphInteraction()` to compute dynamic aspect scaling factors `scaleX = logicalWidth / rect.width` and `scaleY = logicalHeight / rect.height`. Cursor positions are accurately mapped to graph coordinates on any viewport size, from mobile screens up to desktop monitors.
 
-2. **Absence of Mobile Touch Gesture Controls**
-   - Graph interaction only listens for desktop `mousemove`. No touch event handlers (`touchstart`, `touchmove`, `touchend`) exist, preventing touch-based inspection or panning on mobile devices.
+2. **Absence of Mobile Touch Gesture Controls — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js) and [`calculate.css`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.css)
+   - **Resolution:** Added `touchstart`, `touchmove`, and `touchend` event handlers to both canvases. `touchmove` calls `event.preventDefault()` to stop unwanted page scrolling during graph inspection, and `touch-action: none` was added in CSS for responsive touch interaction on mobile devices.
 
-3. **Lack of High-DPI / Retina Canvas Scaling**
-   - Canvas width and height are fixed to HTML dimensions ($900 \times 700$ and $800 \times 600$) without accounting for `window.devicePixelRatio`, resulting in blurry text and low-resolution curves on modern displays.
+3. **Lack of High-DPI / Retina Canvas Scaling — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Implemented Retina display detection using `window.devicePixelRatio`. Both `advancedCanvas` ($900 \times 700$) and `polynomialCanvas` ($800 \times 600$) upscale their internal pixel backing stores by DPR (e.g. $1800 \times 1400$ on 2x Retina displays) and apply `ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` so axes, grid lines, text labels, and curves render with native sharpness.
 
-4. **Poor Asymptote Handling**
-   - Functions with vertical asymptotes (such as $\tan(x)$ or $1/x$) produce erratic vertical lines connecting $+\infty$ and $-\infty$.
+4. **Poor Asymptote Handling — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Added vertical asymptote and pole jump detection in `drawAdvancedFunction()`. When functions like $\tan(x)$, $1/x$, $\sec(x)$, or $\cot(x)$ exhibit rapid sign flips with large jumps across poles, the path is disconnected and resumed with `ctx.moveTo(canvasX, canvasY)` rather than drawing vertical lines between $-\infty$ and $+\infty$. Points outside display boundaries are clipped cleanly.
 
 ---
 

@@ -5440,17 +5440,32 @@ function plotPolynomialGraph() {
         const showRoots = document.getElementById('showRoots').checked;
         const showCriticalPoints = document.getElementById('showCriticalPoints').checked;
         
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Set up Retina / High-DPI support
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+        const logicalWidth = 800;
+        const logicalHeight = 600;
+        
+        canvas.setAttribute('data-logical-width', logicalWidth);
+        canvas.setAttribute('data-logical-height', logicalHeight);
+        
+        const physicalWidth = Math.round(logicalWidth * dpr);
+        const physicalHeight = Math.round(logicalHeight * dpr);
+        if (canvas.width !== physicalWidth || canvas.height !== physicalHeight) {
+            canvas.width = physicalWidth;
+            canvas.height = physicalHeight;
+        }
+        
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, logicalWidth, logicalHeight);
         
         // Set up coordinate system
         const padding = 40;
-        const graphWidth = canvas.width - 2 * padding;
-        const graphHeight = canvas.height - 2 * padding;
+        const graphWidth = logicalWidth - 2 * padding;
+        const graphHeight = logicalHeight - 2 * padding;
         
         // Coordinate transformation functions
         const xToCanvas = (x) => padding + ((x - xMin) / (xMax - xMin)) * graphWidth;
-        const yToCanvas = (y) => canvas.height - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
+        const yToCanvas = (y) => logicalHeight - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
         const canvasToX = (canvasX) => xMin + ((canvasX - padding) / graphWidth) * (xMax - xMin);
         const canvasToY = (canvasY) => yMax - ((canvasY - padding) / graphHeight) * (yMax - yMin);
         
@@ -5800,36 +5815,66 @@ function resetGraphView() {
     showNotification('Graph view reset');
 }
 
-// Add mouse interaction for graph
+// Add mouse and touch interaction for polynomial graph with normalized coordinates
 function initializeGraphInteraction() {
     const canvas = document.getElementById('polynomialCanvas');
+    if (!canvas) return;
     
-    canvas.addEventListener('mousemove', function(event) {
+    function updatePolyCoordinates(clientX, clientY) {
         if (!currentPolynomialForGraph) return;
         
         const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        if (!rect.width || !rect.height) return;
         
-        // Convert to graph coordinates
-        const xMin = parseFloat(document.getElementById('xMin').value) || -10;
-        const xMax = parseFloat(document.getElementById('xMax').value) || 10;
-        const yMin = parseFloat(document.getElementById('yMin').value) || -10;
-        const yMax = parseFloat(document.getElementById('yMax').value) || 10;
+        const logicalWidth = parseFloat(canvas.getAttribute('data-logical-width')) || 800;
+        const logicalHeight = parseFloat(canvas.getAttribute('data-logical-height')) || 600;
+        
+        // Normalize coordinates to compensate for CSS responsive scaling
+        const scaleX = logicalWidth / rect.width;
+        const scaleY = logicalHeight / rect.height;
+        const mouseX = (clientX - rect.left) * scaleX;
+        const mouseY = (clientY - rect.top) * scaleY;
+        
+        const xMin = parseFloat(document.getElementById('xMin')?.value) || -10;
+        const xMax = parseFloat(document.getElementById('xMax')?.value) || 10;
+        const yMin = parseFloat(document.getElementById('yMin')?.value) || -10;
+        const yMax = parseFloat(document.getElementById('yMax')?.value) || 10;
         
         const padding = 40;
-        const graphWidth = canvas.width - 2 * padding;
-        const graphHeight = canvas.height - 2 * padding;
+        const graphWidth = logicalWidth - 2 * padding;
+        const graphHeight = logicalHeight - 2 * padding;
         
-        if (mouseX >= padding && mouseX <= canvas.width - padding &&
-            mouseY >= padding && mouseY <= canvas.height - padding) {
+        if (mouseX >= padding && mouseX <= logicalWidth - padding &&
+            mouseY >= padding && mouseY <= logicalHeight - padding) {
             
             const x = xMin + ((mouseX - padding) / graphWidth) * (xMax - xMin);
             const y = evaluatePolynomial(currentPolynomialForGraph, x);
             
             canvas.title = `x = ${x.toFixed(3)}, f(x) = ${y.toFixed(3)}`;
         }
+    }
+    
+    canvas.addEventListener('mousemove', function(event) {
+        updatePolyCoordinates(event.clientX, event.clientY);
     });
+    
+    canvas.addEventListener('touchstart', function(event) {
+        if (event.touches.length > 0) {
+            updatePolyCoordinates(event.touches[0].clientX, event.touches[0].clientY);
+        }
+    }, { passive: true });
+    
+    canvas.addEventListener('touchmove', function(event) {
+        if (event.touches.length > 0) {
+            const touch = event.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                event.preventDefault();
+                updatePolyCoordinates(touch.clientX, touch.clientY);
+            }
+        }
+    }, { passive: false });
 }
 
 // ===== ADVANCED FUNCTION GRAPHER =====
@@ -6299,7 +6344,7 @@ function evaluateFunction(expression, x, variableName = 'x') {
     }
 }
 
-// Plot advanced graph
+// Plot advanced graph with Retina / High-DPI support
 function plotAdvancedGraph() {
     const canvas = document.getElementById('advancedCanvas');
     if (!canvas) {
@@ -6307,12 +6352,28 @@ function plotAdvancedGraph() {
         return;
     }
     
-    const ctx = canvas.getContext('2d');
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    const logicalWidth = 900;
+    const logicalHeight = 700;
     
-    console.log('Plotting graph with', activeFunctions.length, 'functions');
+    canvas.setAttribute('data-logical-width', logicalWidth);
+    canvas.setAttribute('data-logical-height', logicalHeight);
+    
+    const physicalWidth = Math.round(logicalWidth * dpr);
+    const physicalHeight = Math.round(logicalHeight * dpr);
+    
+    if (canvas.width !== physicalWidth || canvas.height !== physicalHeight) {
+        canvas.width = physicalWidth;
+        canvas.height = physicalHeight;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    
+    console.log('Plotting graph with', activeFunctions.length, 'functions (DPR:', dpr, ')');
     
     if (activeFunctions.length === 0) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, logicalWidth, logicalHeight);
         drawEmptyGraph(ctx);
         return;
     }
@@ -6331,16 +6392,16 @@ function plotAdvancedGraph() {
         
         console.log('Graph settings:', { xMin, xMax, yMin, yMax, resolution });
         
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Clear canvas using logical dimensions
+        ctx.clearRect(0, 0, logicalWidth, logicalHeight);
         
         // Set up coordinate system
         const padding = 50;
-        const graphWidth = canvas.width - 2 * padding;
-        const graphHeight = canvas.height - 2 * padding;
+        const graphWidth = logicalWidth - 2 * padding;
+        const graphHeight = logicalHeight - 2 * padding;
         
         const xToCanvas = (x) => padding + ((x - xMin) / (xMax - xMin)) * graphWidth;
-        const yToCanvas = (y) => canvas.height - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
+        const yToCanvas = (y) => logicalHeight - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
         
         // Draw grid
         if (showGrid) {
@@ -6430,13 +6491,15 @@ function findAndDrawZeros(ctx, func, xMin, xMax, xToCanvas, yToCanvas) {
     });
 }
 
-// Draw advanced function curve
+// Draw advanced function curve with robust asymptote handling
 function drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xToCanvas, yToCanvas) {
     ctx.strokeStyle = func.color;
     ctx.lineWidth = 2.5;
     ctx.setLineDash([]);
     
     const dx = (xMax - xMin) / resolution;
+    const ySpan = yMax - yMin;
+    const logicalHeight = parseFloat(ctx.canvas.getAttribute('data-logical-height')) || 700;
     
     ctx.beginPath();
     let isDrawing = false;
@@ -6448,8 +6511,8 @@ function drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xTo
         try {
             const y = evaluateFunction(func.expression, x);
             
-            // Skip invalid values
-            if (!isFinite(y) || Math.abs(y) > 1e6) {
+            // Skip non-finite or extreme values
+            if (!isFinite(y) || Math.abs(y) > 1e7) {
                 isDrawing = false;
                 lastY = null;
                 continue;
@@ -6458,13 +6521,22 @@ function drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xTo
             const canvasX = xToCanvas(x);
             const canvasY = yToCanvas(y);
             
-            // Detect asymptotes / large vertical jumps
-            if (lastY !== null && Math.abs(y - lastY) > (yMax - yMin) * 0.75) {
-                isDrawing = false;
+            // Detect vertical asymptotes (e.g. tan(x), 1/x, sec(x)):
+            // 1. Extreme vertical jump between adjacent points
+            // 2. Sign flip with large magnitude across the pole
+            if (lastY !== null) {
+                const dy = Math.abs(y - lastY);
+                const isSignFlip = (y * lastY < 0);
+                const isLargeMagnitude = (Math.abs(y) > ySpan * 0.25 || Math.abs(lastY) > ySpan * 0.25);
+                const isAsymptote = (isSignFlip && isLargeMagnitude && dy > ySpan * 0.35) || (dy > ySpan * 1.5);
+                
+                if (isAsymptote) {
+                    isDrawing = false;
+                }
             }
             
-            // Skip if outside canvas bounds
-            if (canvasY < -100 || canvasY > ctx.canvas.height + 100) {
+            // Skip points far outside canvas bounds to prevent erratic line bridges
+            if (canvasY < -100 || canvasY > logicalHeight + 100) {
                 isDrawing = false;
                 lastY = y;
                 continue;
@@ -6632,17 +6704,17 @@ function drawEmptyGraph(ctx) {
     }
     
     try {
+        const width = parseFloat(ctx.canvas.getAttribute('data-logical-width')) || 900;
+        const height = parseFloat(ctx.canvas.getAttribute('data-logical-height')) || 700;
+        const padding = 50;
+
         // Fill background
         ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.fillRect(0, 0, width, height);
         
         // Draw basic grid
         ctx.strokeStyle = '#e2e8f0';
         ctx.lineWidth = 1;
-        
-        const width = ctx.canvas.width;
-        const height = ctx.canvas.height;
-        const padding = 50;
         
         // Vertical lines
         for (let i = 0; i <= 10; i++) {
@@ -6884,39 +6956,77 @@ function loadExampleFunctions() {
     showNotification('Example functions loaded');
 }
 
-// Initialize advanced graph interaction
+// Initialize advanced graph interaction with normalized scaling and touch support
 function initializeAdvancedGraphInteraction() {
     const canvas = document.getElementById('advancedCanvas');
     const coordDisplay = document.getElementById('graphCoordinates');
+    if (!canvas || !coordDisplay) return;
     
-    canvas.addEventListener('mousemove', function(event) {
+    function updateCoordinates(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        if (!rect.width || !rect.height) return;
         
-        const xMin = parseFloat(document.getElementById('graphXMin').value) || -10;
-        const xMax = parseFloat(document.getElementById('graphXMax').value) || 10;
-        const yMin = parseFloat(document.getElementById('graphYMin').value) || -10;
-        const yMax = parseFloat(document.getElementById('graphYMax').value) || 10;
+        const logicalWidth = parseFloat(canvas.getAttribute('data-logical-width')) || 900;
+        const logicalHeight = parseFloat(canvas.getAttribute('data-logical-height')) || 700;
+        
+        // Exact scaling factor between CSS display pixels and canvas internal coordinates
+        const scaleX = logicalWidth / rect.width;
+        const scaleY = logicalHeight / rect.height;
+        const mouseX = (clientX - rect.left) * scaleX;
+        const mouseY = (clientY - rect.top) * scaleY;
+        
+        const xMin = parseFloat(document.getElementById('graphXMin')?.value || document.getElementById('advancedXMin')?.value) || -10;
+        const xMax = parseFloat(document.getElementById('graphXMax')?.value || document.getElementById('advancedXMax')?.value) || 10;
+        const yMin = parseFloat(document.getElementById('graphYMin')?.value || document.getElementById('advancedYMin')?.value) || -10;
+        const yMax = parseFloat(document.getElementById('graphYMax')?.value || document.getElementById('advancedYMax')?.value) || 10;
         
         const padding = 50;
-        const graphWidth = canvas.width - 2 * padding;
-        const graphHeight = canvas.height - 2 * padding;
+        const graphWidth = logicalWidth - 2 * padding;
+        const graphHeight = logicalHeight - 2 * padding;
         
-        if (mouseX >= padding && mouseX <= canvas.width - padding &&
-            mouseY >= padding && mouseY <= canvas.height - padding) {
+        if (mouseX >= padding && mouseX <= logicalWidth - padding &&
+            mouseY >= padding && mouseY <= logicalHeight - padding) {
             
             const x = xMin + ((mouseX - padding) / graphWidth) * (xMax - xMin);
             const y = yMax - ((mouseY - padding) / graphHeight) * (yMax - yMin);
             
             coordDisplay.textContent = `x = ${x.toFixed(3)}, y = ${y.toFixed(3)}`;
         } else {
-            coordDisplay.textContent = 'Move mouse over graph to see coordinates';
+            coordDisplay.textContent = 'Move mouse or touch graph to see coordinates';
         }
+    }
+    
+    // Desktop mouse events
+    canvas.addEventListener('mousemove', function(event) {
+        updateCoordinates(event.clientX, event.clientY);
     });
     
     canvas.addEventListener('mouseleave', function() {
-        coordDisplay.textContent = 'Move mouse over graph to see coordinates';
+        coordDisplay.textContent = 'Move mouse or touch graph to see coordinates';
+    });
+    
+    // Mobile touch events
+    canvas.addEventListener('touchstart', function(event) {
+        if (event.touches.length > 0) {
+            updateCoordinates(event.touches[0].clientX, event.touches[0].clientY);
+        }
+    }, { passive: true });
+    
+    canvas.addEventListener('touchmove', function(event) {
+        if (event.touches.length > 0) {
+            const touch = event.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            // Prevent native page scroll while inspecting graph
+            if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                event.preventDefault();
+                updateCoordinates(touch.clientX, touch.clientY);
+            }
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('touchend', function() {
+        coordDisplay.textContent = 'Move mouse or touch graph to see coordinates';
     });
 }
 // Test function for debugging
