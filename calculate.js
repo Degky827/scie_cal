@@ -201,12 +201,39 @@ function appendFunction(func) {
     updateDisplay();
 }
 
+// Physical & Mathematical Constants
+const SCIENTIFIC_CONSTANTS = {
+    pi: Math.PI,
+    e: Math.E,
+    c: 299792458,              // Speed of light in vacuum (m/s)
+    g: 9.80665,                // Standard acceleration of gravity (m/s^2)
+    G: 6.67430e-11,            // Universal gravitational constant (m^3 kg^-1 s^-2)
+    h: 6.62607015e-34,         // Planck constant (J*s)
+    hbar: 1.054571817e-34,     // Reduced Planck constant (J*s)
+    k: 1.380649e-23,           // Boltzmann constant (J/K)
+    Na: 6.02214076e23,         // Avogadro constant (mol^-1)
+    qe: 1.602176634e-19,       // Elementary charge (C)
+    me: 9.1093837015e-31,      // Electron rest mass (kg)
+    mp: 1.67262192369e-27,     // Proton rest mass (kg)
+    eps0: 8.8541878128e-12,    // Vacuum permittivity (F/m)
+    mu0: 1.25663706212e-6,     // Vacuum permeability (N/A^2)
+    R: 8.314462618             // Molar gas constant (J/(mol*K))
+};
+
+function getConstant(constant) {
+    return SCIENTIFIC_CONSTANTS[constant];
+}
+
 function appendConstant(constant) {
-    const value = constant === 'pi' ? Math.PI : Math.E;
+    const val = SCIENTIFIC_CONSTANTS[constant] !== undefined 
+        ? SCIENTIFIC_CONSTANTS[constant] 
+        : (constant === 'pi' ? Math.PI : Math.E);
+    
+    const valStr = formatResult(val);
     if (currentInput === '0' || currentInput === 'Error') {
-        currentInput = value.toString();
+        currentInput = valStr;
     } else {
-        currentInput += value.toString();
+        currentInput += valStr;
     }
     updateDisplay();
 }
@@ -7223,7 +7250,214 @@ function testGraphFunctionality() {
 // Add test button functionality (call this from browser console)
 window.testGraphFunctionality = testGraphFunctionality;
 
-// Export helper functions to window
+// ===== STEP 6: SCIENTIFIC ENHANCEMENTS =====
+
+// --- Unit Converter Engine ---
+function convertUnits(val, from, to, category) {
+    const v = Number(val);
+    if (isNaN(v)) return NaN;
+    if (from === to) return v;
+    
+    const fLower = String(from).toLowerCase();
+    const tLower = String(to).toLowerCase();
+    
+    // Temperature special case
+    if (category === 'temperature' || ['c', 'f', 'k'].includes(fLower) && ['c', 'f', 'k'].includes(tLower)) {
+        let kelvin;
+        if (fLower === 'c') kelvin = v + 273.15;
+        else if (fLower === 'f') kelvin = (v - 32) * (5 / 9) + 273.15;
+        else kelvin = v;
+        
+        if (tLower === 'c') return kelvin - 273.15;
+        if (tLower === 'f') return (kelvin - 273.15) * (9 / 5) + 32;
+        return kelvin;
+    }
+    
+    // Scale-based conversion table (rates relative to base unit)
+    const RATES = {
+        // Length (base: meter)
+        m: 1, km: 1000, cm: 0.01, mm: 0.001, um: 1e-6, nm: 1e-9,
+        mi: 1609.344, yd: 0.9144, ft: 0.3048, in: 0.0254,
+        // Mass (base: kg)
+        kg: 1, g: 0.001, mg: 1e-6, lb: 0.45359237, oz: 0.028349523125, ton: 1000,
+        // Pressure (base: Pa)
+        pa: 1, kpa: 1000, bar: 100000, psi: 6894.757, atm: 101325, mmhg: 133.322,
+        // Energy (base: Joules)
+        j: 1, kj: 1000, cal: 4.184, kcal: 4184, wh: 3600, kwh: 3600000, ev: 1.602176634e-19,
+        // Angle (base: radians)
+        rad: 1, deg: Math.PI / 180, grad: Math.PI / 200,
+        // Time (base: seconds)
+        s: 1, ms: 0.001, min: 60, hr: 3600, day: 86400, yr: 31536000
+    };
+    
+    const fRate = RATES[fLower];
+    const tRate = RATES[tLower];
+    
+    if (fRate === undefined || tRate === undefined) {
+        throw new Error(`Unsupported unit conversion from ${from} to ${to}`);
+    }
+    
+    return (v * fRate) / tRate;
+}
+
+// --- Complex Number Arithmetic Class ---
+class Complex {
+    constructor(real = 0, imag = 0) {
+        this.real = Number(real) || 0;
+        this.imag = Number(imag) || 0;
+    }
+    
+    add(other) {
+        const o = Complex.from(other);
+        return new Complex(this.real + o.real, this.imag + o.imag);
+    }
+    
+    sub(other) {
+        const o = Complex.from(other);
+        return new Complex(this.real - o.real, this.imag - o.imag);
+    }
+    
+    mul(other) {
+        const o = Complex.from(other);
+        return new Complex(
+            this.real * o.real - this.imag * o.imag,
+            this.real * o.imag + this.imag * o.real
+        );
+    }
+    
+    div(other) {
+        const o = Complex.from(other);
+        const denom = o.real * o.real + o.imag * o.imag;
+        if (denom === 0) throw new Error('Complex division by zero');
+        return new Complex(
+            (this.real * o.real + this.imag * o.imag) / denom,
+            (this.imag * o.real - this.real * o.imag) / denom
+        );
+    }
+    
+    abs() {
+        return Math.hypot(this.real, this.imag);
+    }
+    
+    arg() {
+        return Math.atan2(this.imag, this.real);
+    }
+    
+    conj() {
+        return new Complex(this.real, -this.imag);
+    }
+    
+    pow(n) {
+        const r = this.abs();
+        const theta = this.arg();
+        const rn = Math.pow(r, n);
+        return new Complex(rn * Math.cos(n * theta), rn * Math.sin(n * theta));
+    }
+    
+    toString() {
+        const r = Math.round(this.real * 1e10) / 1e10;
+        const i = Math.round(this.imag * 1e10) / 1e10;
+        if (i === 0) return `${r}`;
+        if (r === 0) return i === 1 ? 'i' : (i === -1 ? '-i' : `${i}i`);
+        const sign = i > 0 ? '+' : '-';
+        const absI = Math.abs(i);
+        const iStr = absI === 1 ? 'i' : `${absI}i`;
+        return `${r} ${sign} ${iStr}`;
+    }
+    
+    static from(val) {
+        if (val instanceof Complex) return val;
+        if (typeof val === 'number') return new Complex(val, 0);
+        if (typeof val === 'string') return Complex.parse(val);
+        if (typeof val === 'object' && val !== null) {
+            return new Complex(val.real || val.r || 0, val.imag || val.i || 0);
+        }
+        return new Complex(0, 0);
+    }
+    
+    static parse(str) {
+        str = String(str).replace(/\s+/g, '');
+        if (!str) return new Complex(0, 0);
+        
+        // Pure imaginary: '3i', '-i', '+i', '2.5i'
+        const pureImag = str.match(/^([+-]?\d*(?:\.\d+)?)[ij]$/i);
+        if (pureImag) {
+            const coeff = pureImag[1] === '' || pureImag[1] === '+' ? 1 : (pureImag[1] === '-' ? -1 : parseFloat(pureImag[1]));
+            return new Complex(0, coeff);
+        }
+        
+        // Pure real: '5', '-3.14'
+        if (/^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(str)) {
+            return new Complex(parseFloat(str), 0);
+        }
+        
+        // Combined 'a+bi' or 'a-bi'
+        const match = str.match(/^([+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?)([+-]\d*(?:\.\d+)?)?[ij]$/i);
+        if (match) {
+            const real = parseFloat(match[1]) || 0;
+            const imagStr = match[2];
+            const imag = (!imagStr || imagStr === '+') ? 1 : (imagStr === '-' ? -1 : parseFloat(imagStr));
+            return new Complex(real, imag);
+        }
+        
+        throw new Error('Invalid complex number format: ' + str);
+    }
+}
+
+// --- Vector Operations Engine ---
+const VectorOps = {
+    dot(u, v) {
+        if (!Array.isArray(u) || !Array.isArray(v) || u.length !== v.length) {
+            throw new Error('Vectors must be arrays of equal dimension');
+        }
+        return u.reduce((sum, ui, i) => sum + ui * v[i], 0);
+    },
+    cross(u, v) {
+        if (u.length !== 3 || v.length !== 3) {
+            throw new Error('Cross product is defined for 3D vectors');
+        }
+        return [
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0]
+        ];
+    },
+    magnitude(u) {
+        return Math.hypot(...u);
+    },
+    normalize(u) {
+        const mag = this.magnitude(u);
+        if (mag === 0) throw new Error('Cannot normalize zero vector');
+        return u.map(x => x / mag);
+    },
+    angle(u, v) {
+        const dot = this.dot(u, v);
+        const mag = this.magnitude(u) * this.magnitude(v);
+        if (mag === 0) throw new Error('Cannot calculate angle with zero vector');
+        const cosTheta = Math.max(-1, Math.min(1, dot / mag));
+        return Math.acos(cosTheta);
+    }
+};
+
+// --- Multi-Variable Calculus: Partial Derivatives & Gradient ---
+function evaluateFunctionMulti(expression, scopeObj) {
+    const keys = Object.keys(scopeObj);
+    const vals = Object.values(scopeObj);
+    return evaluateFunction(expression, scopeObj.x !== undefined ? scopeObj.x : vals[0]);
+}
+
+function calculatePartialDerivative(fnExpr, point, wrtVariable = 'x', h = 1e-6) {
+    const xVal = point[wrtVariable] !== undefined ? point[wrtVariable] : 0;
+    const f1 = evaluateFunction(fnExpr, xVal + h, wrtVariable);
+    const f2 = evaluateFunction(fnExpr, xVal - h, wrtVariable);
+    return (f1 - f2) / (2 * h);
+}
+
+function calculateGradient(fnExpr, point, variables = ['x', 'y']) {
+    return variables.map(v => calculatePartialDerivative(fnExpr, point, v));
+}
+
+// Export helper functions and modules to window / global
 window.testGraphFunctionality = testGraphFunctionality;
 window.manualGraphTest = manualGraphTest;
 window.testGrapher = testGrapher;
@@ -7231,5 +7465,14 @@ window.loadExample = loadExample;
 window.loadBinomialExample = loadBinomialExample;
 window.loadGraphExample = loadGraphExample;
 window.drawFunctionCurve = drawFunctionCurve;
+
+// Export Step 6 scientific modules
+window.SCIENTIFIC_CONSTANTS = SCIENTIFIC_CONSTANTS;
+window.getConstant = getConstant;
+window.convertUnits = convertUnits;
+window.Complex = Complex;
+window.VectorOps = VectorOps;
+window.calculatePartialDerivative = calculatePartialDerivative;
+window.calculateGradient = calculateGradient;
 
 console.log('Calculator JavaScript loaded successfully');

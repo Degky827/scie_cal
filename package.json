@@ -1,0 +1,22 @@
+{
+  "name": "scientific-calculator-pwa",
+  "version": "1.1.0",
+  "description": "Comprehensive scientific calculator Progressive Web App with calculus, graphing, matrices, and combinatorics",
+  "main": "calculate.js",
+  "scripts": {
+    "test": "node test/run_tests.js",
+    "check-syntax": "node -c calculate.js sw.js"
+  },
+  "keywords": [
+    "calculator",
+    "scientific-calculator",
+    "pwa",
+    "graphing",
+    "polynomial",
+    "matrices",
+    "calculus",
+    "complex-numbers"
+  ],
+  "author": "",
+  "license": "MIT"
+}
