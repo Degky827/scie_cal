@@ -167,14 +167,66 @@ function appendConstant(constant) {
     updateDisplay();
 }
 
-// Basic operations
-function calculate() {
-    if (!previousInput || !operation) return;
+// Helper to parse input values or evaluate parenthesized arithmetic expressions
+function evaluateArithmetic(val) {
+    if (typeof val === 'number') return val;
+    val = String(val).trim();
+    if (!val || val === 'Error') return NaN;
+    
+    // Simple numeric string
+    if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(val)) {
+        return parseFloat(val);
+    }
     
     try {
+        if (typeof math !== 'undefined' && math.evaluate) {
+            const res = math.evaluate(val);
+            return typeof res === 'number' ? res : (res && res.valueOf ? Number(res.valueOf()) : NaN);
+        }
+        const sanitized = val.replace(/\^/g, '**');
+        const fn = new Function('"use strict"; return (' + sanitized + ');');
+        const res = fn();
+        return typeof res === 'number' ? res : NaN;
+    } catch (e) {
+        return NaN;
+    }
+}
+
+// Basic operations
+function calculate() {
+    try {
+        // If an expression with parentheses or operators is entered in currentInput
+        if (!previousInput && currentInput) {
+            if (currentInput.includes('(') || /[+*\/^]/.test(currentInput)) {
+                const evaluated = evaluateArithmetic(currentInput);
+                if (!isNaN(evaluated)) {
+                    addToHistory(currentInput, evaluated);
+                    currentInput = evaluated.toString();
+                    updateDisplay();
+                    return;
+                }
+            }
+        }
+
+        if (!previousInput || !operation) return;
+        
         let result;
-        const prev = parseFloat(previousInput);
-        const current = parseFloat(currentInput);
+        const prev = evaluateArithmetic(previousInput);
+        const current = evaluateArithmetic(currentInput);
+        
+        if (isNaN(prev) || isNaN(current)) {
+            const fullExpr = `${previousInput} ${operation} ${currentInput}`;
+            const fullVal = evaluateArithmetic(fullExpr);
+            if (!isNaN(fullVal)) {
+                addToHistory(fullExpr, fullVal);
+                currentInput = fullVal.toString();
+                previousInput = '';
+                operation = null;
+                updateDisplay();
+                return;
+            }
+            throw new Error('Invalid calculation');
+        }
         
         switch(operation) {
             case '+':
@@ -1579,21 +1631,33 @@ function quickBellNumber() {
     }
 }
 // Load example into binomial calculator
-function loadExample(a, b, n) {
-    document.getElementById('binomialA').value = a;
-    document.getElementById('binomialB').value = b;
-    document.getElementById('binomialN').value = n;
+function loadBinomialExample(a, b, n) {
+    const aInput = document.getElementById('binomialA');
+    const bInput = document.getElementById('binomialB');
+    const nInput = document.getElementById('binomialN');
+    if (aInput) aInput.value = a;
+    if (bInput) bInput.value = b;
+    if (nInput) nInput.value = n;
     
     // Switch to constant term mode for fractional examples
-    if (b.includes('/x')) {
+    if (b && b.includes('/x')) {
         setBinomialMode('constant');
         // Manually trigger the mode change since event.target won't be available
-        document.querySelectorAll('.btn-option').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.binomial-options .btn-option').forEach(btn => btn.classList.remove('active'));
         const constBtn = document.querySelector('.binomial-options [onclick*="constant"]');
         if (constBtn) constBtn.classList.add('active');
     }
     
     showNotification(`Loaded example: (${a} + ${b})^${n}`);
+}
+
+// Global loadExample supporting both binomial (3 args) and grapher (1 arg)
+function loadExample(arg1, arg2, arg3) {
+    if (arguments.length >= 2 || (arg2 !== undefined && arg3 !== undefined)) {
+        loadBinomialExample(arg1, arg2, arg3);
+    } else if (typeof loadGraphExample === 'function') {
+        loadGraphExample(arg1);
+    }
 }
 
 // Multinomial Theorem Functions
@@ -2968,22 +3032,6 @@ function loadMatrixExample(exampleType) {
     }
 }
 
-// Get determinant matrix from inputs
-function getDetMatrix() {
-    const size = parseInt(document.getElementById('detMatrixSize').value);
-    const matrix = [];
-    
-    for (let i = 0; i < size; i++) {
-        matrix[i] = [];
-        for (let j = 0; j < size; j++) {
-            const value = parseFloat(document.getElementById(`det${i}${j}`).value) || 0;
-            matrix[i][j] = value;
-        }
-    }
-    
-    return matrix;
-}
-
 // Get linear system (if not already defined)
 function getLinearSystem() {
     const size = parseInt(document.getElementById('systemSize').value);
@@ -3591,8 +3639,24 @@ function initializeGPACalculator() {
 
 // Update course input fields based on number of courses
 function updateCourseInputs() {
-    const numCourses = parseInt(document.getElementById('numCourses').value);
+    const numCoursesInput = document.getElementById('numCourses');
+    if (!numCoursesInput) return;
+    const numCourses = parseInt(numCoursesInput.value);
     const container = document.getElementById('coursesContainer');
+    if (!container) return;
+    
+    // Save existing user input before rebuilding
+    const existingData = [];
+    const existingElements = container.querySelectorAll('.course-input');
+    existingElements.forEach((el, index) => {
+        const i = index + 1;
+        existingData.push({
+            name: document.getElementById(`courseName${i}`)?.value || '',
+            credits: document.getElementById(`credits${i}`)?.value || '',
+            grade: document.getElementById(`grade${i}`)?.value || '',
+            percentage: document.getElementById(`percentage${i}`)?.value || ''
+        });
+    });
     
     container.innerHTML = '';
     
@@ -3636,6 +3700,22 @@ function updateCourseInputs() {
     
     updateGradeOptions();
     updateInputMode();
+
+    // Restore preserved data
+    for (let i = 1; i <= Math.min(numCourses, existingData.length); i++) {
+        const data = existingData[i - 1];
+        const nameEl = document.getElementById(`courseName${i}`);
+        const creditsEl = document.getElementById(`credits${i}`);
+        const gradeEl = document.getElementById(`grade${i}`);
+        const percentageEl = document.getElementById(`percentage${i}`);
+        if (nameEl && data.name) nameEl.value = data.name;
+        if (creditsEl && data.credits) creditsEl.value = data.credits;
+        if (gradeEl && data.grade) gradeEl.value = data.grade;
+        if (percentageEl && data.percentage) {
+            percentageEl.value = data.percentage;
+            updateGradeFromPercentage(i);
+        }
+    }
 }
 
 // Update grade options based on selected scale
@@ -3798,14 +3878,87 @@ function updateGradeScaleReference() {
 
 // Remove a course
 function removeCourse(courseNum) {
-    const numCourses = parseInt(document.getElementById('numCourses').value);
+    const numCoursesInput = document.getElementById('numCourses');
+    if (!numCoursesInput) return;
+    const numCourses = parseInt(numCoursesInput.value);
     if (numCourses <= 1) {
         showNotification('Cannot remove the last course');
         return;
     }
     
-    document.getElementById('numCourses').value = numCourses - 1;
-    updateCourseInputs();
+    // Collect data from all courses except the one to remove
+    const preservedData = [];
+    for (let i = 1; i <= numCourses; i++) {
+        if (i === courseNum) continue;
+        preservedData.push({
+            name: document.getElementById(`courseName${i}`)?.value || '',
+            credits: document.getElementById(`credits${i}`)?.value || '',
+            grade: document.getElementById(`grade${i}`)?.value || '',
+            percentage: document.getElementById(`percentage${i}`)?.value || ''
+        });
+    }
+    
+    numCoursesInput.value = preservedData.length;
+    
+    const container = document.getElementById('coursesContainer');
+    container.innerHTML = '';
+    
+    for (let i = 1; i <= preservedData.length; i++) {
+        const courseDiv = document.createElement('div');
+        courseDiv.className = 'course-input';
+        courseDiv.innerHTML = `
+            <div class="course-header">
+                <h4>Course ${i}</h4>
+                <button class="btn-remove-course" onclick="removeCourse(${i})" title="Remove Course">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="course-fields">
+                <div class="field-group">
+                    <label>Course Name:</label>
+                    <input type="text" id="courseName${i}" placeholder="e.g., Calculus I" class="course-name-input">
+                </div>
+                <div class="field-group">
+                    <label>Credit Hours:</label>
+                    <input type="number" id="credits${i}" placeholder="3" min="0.5" max="6" step="0.5" class="credits-input">
+                </div>
+                <div class="field-group grade-input-group" id="gradeGroup${i}">
+                    <label>Grade:</label>
+                    <select id="grade${i}" class="grade-select">
+                        <option value="">Select Grade</option>
+                    </select>
+                </div>
+                <div class="field-group percentage-input-group" id="percentageGroup${i}">
+                    <label>Percentage:</label>
+                    <input type="number" id="percentage${i}" placeholder="85" min="0" max="100" step="0.1" class="percentage-input" onchange="updateGradeFromPercentage(${i})" oninput="updateGradeFromPercentage(${i})">
+                </div>
+                <div class="field-group auto-grade-display" id="autoGradeDisplay${i}" style="display: none;">
+                    <label>Auto Grade:</label>
+                    <div class="auto-grade-value" id="autoGrade${i}">--</div>
+                </div>
+            </div>
+        `;
+        container.appendChild(courseDiv);
+    }
+    
+    updateGradeOptions();
+    updateInputMode();
+    
+    for (let i = 1; i <= preservedData.length; i++) {
+        const data = preservedData[i - 1];
+        const nameEl = document.getElementById(`courseName${i}`);
+        const creditsEl = document.getElementById(`credits${i}`);
+        const gradeEl = document.getElementById(`grade${i}`);
+        const percentageEl = document.getElementById(`percentage${i}`);
+        if (nameEl && data.name) nameEl.value = data.name;
+        if (creditsEl && data.credits) creditsEl.value = data.credits;
+        if (gradeEl && data.grade) gradeEl.value = data.grade;
+        if (percentageEl && data.percentage) {
+            percentageEl.value = data.percentage;
+            updateGradeFromPercentage(i);
+        }
+    }
+    
     showNotification(`Course ${courseNum} removed`);
 }
 
@@ -4218,6 +4371,9 @@ function getPercentageFromGrade(grade) {
 function initializePolynomialSolver() {
     updateCoefficientInputs();
     updatePolynomialInputMethod();
+    if (typeof initializeGraphInteraction === 'function') {
+        initializeGraphInteraction();
+    }
 }
 
 // Update polynomial input method
@@ -5526,12 +5682,6 @@ function initializeGraphInteraction() {
     });
 }
 
-// Initialize graph interaction when polynomial mode is loaded
-function initializePolynomialSolver() {
-    updateCoefficientInputs();
-    updatePolynomialInputMethod();
-    initializeGraphInteraction();
-}
 // ===== ADVANCED FUNCTION GRAPHER =====
 
 let activeFunctions = [];
@@ -5920,51 +6070,50 @@ function addFunctionToGraph() {
 // Evaluate mathematical function
 function evaluateFunction(expression, x) {
     try {
-        // Replace mathematical constants and functions
-        let expr = expression
-            .replace(/\bpi\b/g, Math.PI)
-            .replace(/\be\b/g, Math.E)
-            .replace(/\bx\b/g, `(${x})`)
-            .replace(/sin/g, 'Math.sin')
-            .replace(/cos/g, 'Math.cos')
-            .replace(/tan/g, 'Math.tan')
-            .replace(/sec/g, '(1/Math.cos')
-            .replace(/csc/g, '(1/Math.sin')
-            .replace(/cot/g, '(1/Math.tan')
-            .replace(/\blog\b/g, 'Math.log10')
-            .replace(/\bln\b/g, 'Math.log')
-            .replace(/\bexp\b/g, 'Math.exp')
-            .replace(/\bsqrt\b/g, 'Math.sqrt')
-            .replace(/\babs\b/g, 'Math.abs')
-            .replace(/\bfloor\b/g, 'Math.floor')
-            .replace(/\bceil\b/g, 'Math.ceil')
-            .replace(/\bround\b/g, 'Math.round')
-            .replace(/\^/g, '**');
-        
-        // Handle angle mode for trigonometric functions (graph controls)
         const angleMode = document.getElementById('graphAngleMode')?.value || 'radians';
-        if (angleMode === 'degrees') {
-            expr = expr
-                .replace(/Math\.sin\(/g, 'Math.sin(Math.PI/180*')
-                .replace(/Math\.cos\(/g, 'Math.cos(Math.PI/180*')
-                .replace(/Math\.tan\(/g, 'Math.tan(Math.PI/180*');
-        }
-        
-        // Fix parentheses for sec, csc, cot
-        expr = expr
-            .replace(/\(1\/Math\.cos\(/g, '(1/Math.cos(')
-            .replace(/\(1\/Math\.sin\(/g, '(1/Math.sin(')
-            .replace(/\(1\/Math\.tan\(/g, '(1/Math.tan(');
-        
-        // Evaluate the expression safely
-        try {
-            const result = eval(expr);
-            return result;
-        } catch (evalError) {
-            // Fallback to Function constructor
-            const result = Function('"use strict"; return (' + expr + ')')();
-            return result;
-        }
+        const isDeg = (angleMode === 'degrees' || angleMode === 'deg');
+
+        const scope = {
+            x: Number(x),
+            pi: Math.PI, PI: Math.PI,
+            e: Math.E, E: Math.E,
+            sin: (u) => isDeg ? Math.sin(u * Math.PI / 180) : Math.sin(u),
+            cos: (u) => isDeg ? Math.cos(u * Math.PI / 180) : Math.cos(u),
+            tan: (u) => isDeg ? Math.tan(u * Math.PI / 180) : Math.tan(u),
+            asin: (u) => isDeg ? Math.asin(u) * 180 / Math.PI : Math.asin(u),
+            acos: (u) => isDeg ? Math.acos(u) * 180 / Math.PI : Math.acos(u),
+            atan: (u) => isDeg ? Math.atan(u) * 180 / Math.PI : Math.atan(u),
+            sec: (u) => 1 / (isDeg ? Math.cos(u * Math.PI / 180) : Math.cos(u)),
+            csc: (u) => 1 / (isDeg ? Math.sin(u * Math.PI / 180) : Math.sin(u)),
+            cot: (u) => 1 / (isDeg ? Math.tan(u * Math.PI / 180) : Math.tan(u)),
+            ln: Math.log,
+            log: Math.log10,
+            log10: Math.log10,
+            log2: Math.log2,
+            exp: Math.exp,
+            sqrt: Math.sqrt,
+            cbrt: Math.cbrt,
+            abs: Math.abs,
+            floor: Math.floor,
+            ceil: Math.ceil,
+            round: Math.round
+        };
+
+        let expr = String(expression).trim();
+        expr = expr.replace(/\^/g, '**');
+
+        // Implicit multiplication:
+        // A number (not part of identifier like log2) followed by a letter or opening paren
+        expr = expr.replace(/(?<![a-zA-Z_])(\d+(?:\.\d+)?)\s*([a-zA-Z_(])/g, '$1*$2');
+        // Closing paren followed by letter, opening paren, or digit
+        expr = expr.replace(/(\))\s*([a-zA-Z_\d(])/g, '$1*$2');
+
+        const paramNames = Object.keys(scope);
+        const paramValues = Object.values(scope);
+
+        const fn = new Function(...paramNames, '"use strict"; return (' + expr + ');');
+        const val = fn(...paramValues);
+        return typeof val === 'number' ? val : NaN;
     } catch (error) {
         throw new Error('Invalid expression: ' + error.message);
     }
@@ -5989,16 +6138,16 @@ function plotAdvancedGraph() {
     }
     
     try {
-        const xMin = parseFloat(document.getElementById('graphXMin')?.value) || -10;
-        const xMax = parseFloat(document.getElementById('graphXMax')?.value) || 10;
-        const yMin = parseFloat(document.getElementById('graphYMin')?.value) || -10;
-        const yMax = parseFloat(document.getElementById('graphYMax')?.value) || 10;
+        const xMin = parseFloat(document.getElementById('graphXMin')?.value || document.getElementById('advancedXMin')?.value) || -10;
+        const xMax = parseFloat(document.getElementById('graphXMax')?.value || document.getElementById('advancedXMax')?.value) || 10;
+        const yMin = parseFloat(document.getElementById('graphYMin')?.value || document.getElementById('advancedYMin')?.value) || -10;
+        const yMax = parseFloat(document.getElementById('graphYMax')?.value || document.getElementById('advancedYMax')?.value) || 10;
         const resolution = parseInt(document.getElementById('graphResolution')?.value) || 1000;
         
-        const showGrid = document.getElementById('showAdvancedGrid')?.checked ?? true;
-        const showAxes = document.getElementById('showAxes')?.checked ?? true;
-        const showLabels = document.getElementById('showLabels')?.checked ?? true;
-        const showZeros = document.getElementById('showZeros')?.checked ?? true;
+        const showGrid = (document.getElementById('showAdvancedGrid') || document.getElementById('advancedShowGrid'))?.checked ?? true;
+        const showAxes = (document.getElementById('showAxes') || document.getElementById('advancedShowAxes'))?.checked ?? true;
+        const showLabels = (document.getElementById('showLabels') || document.getElementById('advancedShowLabels'))?.checked ?? true;
+        const showZeros = (document.getElementById('showZeros') || document.getElementById('advancedShowZeros'))?.checked ?? true;
         
         console.log('Graph settings:', { xMin, xMax, yMin, yMax, resolution });
         
@@ -6111,6 +6260,7 @@ function drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xTo
     
     ctx.beginPath();
     let isDrawing = false;
+    let lastY = null;
     
     for (let i = 0; i <= resolution; i++) {
         const x = xMin + i * dx;
@@ -6121,15 +6271,22 @@ function drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xTo
             // Skip invalid values
             if (!isFinite(y) || Math.abs(y) > 1e6) {
                 isDrawing = false;
+                lastY = null;
                 continue;
             }
             
             const canvasX = xToCanvas(x);
             const canvasY = yToCanvas(y);
             
-            // Skip if outside canvas bounds
-            if (canvasY < -100 || canvasY > canvas.height + 100) {
+            // Detect asymptotes / large vertical jumps
+            if (lastY !== null && Math.abs(y - lastY) > (yMax - yMin) * 0.75) {
                 isDrawing = false;
+            }
+            
+            // Skip if outside canvas bounds
+            if (canvasY < -100 || canvasY > ctx.canvas.height + 100) {
+                isDrawing = false;
+                lastY = y;
                 continue;
             }
             
@@ -6139,12 +6296,22 @@ function drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xTo
             } else {
                 ctx.lineTo(canvasX, canvasY);
             }
+            lastY = y;
         } catch (error) {
             isDrawing = false;
+            lastY = null;
         }
     }
     
     ctx.stroke();
+}
+
+// Function curve drawer with safe yMin/yMax resolution
+function drawFunctionCurve(ctx, func, xMin, xMax, xToCanvas, yToCanvas) {
+    const yMin = parseFloat(document.getElementById('graphYMin')?.value || document.getElementById('advancedYMin')?.value) || -10;
+    const yMax = parseFloat(document.getElementById('graphYMax')?.value || document.getElementById('advancedYMax')?.value) || 10;
+    const resolution = parseInt(document.getElementById('graphResolution')?.value) || 1000;
+    drawAdvancedFunction(ctx, func, xMin, xMax, yMin, yMax, resolution, xToCanvas, yToCanvas);
 }
 
 // Draw advanced grid
@@ -6490,10 +6657,11 @@ function resetAdvancedGraph() {
     showNotification('Graph reset');
 }
 
-// Load example function
-function loadExample(expression) {
+// Load example function into grapher
+function loadGraphExample(expression) {
     console.log('Loading example:', expression);
-    document.getElementById('customFunctionInput').value = expression;
+    const customInput = document.getElementById('customFunctionInput');
+    if (customInput) customInput.value = expression;
     setFunctionType('custom');
     
     // Update tab states
@@ -6725,687 +6893,13 @@ function testGraphFunctionality() {
 // Add test button functionality (call this from browser console)
 window.testGraphFunctionality = testGraphFunctionality;
 
-// Complete the evaluateFunction that was cut off
-function evaluateFunction(expression, x) {
-    try {
-        // Replace mathematical constants and functions
-        let expr = expression
-            .replace(/\bpi\b/g, Math.PI)
-            .replace(/\be\b/g, Math.E)
-            .replace(/\bx\b/g, `(${x})`)
-            .replace(/sin/g, 'Math.sin')
-            .replace(/cos/g, 'Math.cos')
-            .replace(/tan/g, 'Math.tan')
-            .replace(/sec/g, '(1/Math.cos')
-            .replace(/csc/g, '(1/Math.sin')
-            .replace(/cot/g, '(1/Math.tan')
-            .replace(/ln/g, 'Math.log')
-            .replace(/log/g, 'Math.log10')
-            .replace(/log2/g, '(Math.log(x)/Math.log(2))')
-            .replace(/exp/g, 'Math.exp')
-            .replace(/sqrt/g, 'Math.sqrt')
-            .replace(/abs/g, 'Math.abs')
-            .replace(/floor/g, 'Math.floor')
-            .replace(/ceil/g, 'Math.ceil')
-            .replace(/round/g, 'Math.round')
-            .replace(/\^/g, '**');
-        
-        // Fix any incomplete parentheses from sec/csc replacements
-        expr = expr.replace(/\(1\/Math\.(cos|sin)\(/g, '(1/Math.$1(');
-        
-        return eval(expr);
-    } catch (error) {
-        throw new Error(`Invalid function: ${error.message}`);
-    }
-}
-
-// Update function list display
-function updateFunctionList() {
-    const listContainer = document.getElementById('functionList');
-    if (!listContainer) return;
-    
-    if (activeFunctions.length === 0) {
-        listContainer.innerHTML = '<p class="no-functions">No functions added yet</p>';
-        return;
-    }
-    
-    listContainer.innerHTML = activeFunctions.map(func => `
-        <div class="function-item" style="border-left: 4px solid ${func.color}">
-            <div class="function-info">
-                <span class="function-expression">${func.expression}</span>
-                <span class="function-type">${func.type}</span>
-            </div>
-            <div class="function-controls">
-                <button class="btn-toggle ${func.visible ? 'active' : ''}" onclick="toggleFunction(${func.id})">
-                    <i class="fas fa-eye${func.visible ? '' : '-slash'}"></i>
-                </button>
-                <button class="btn-remove" onclick="removeFunction(${func.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Toggle function visibility
-function toggleFunction(id) {
-    const func = activeFunctions.find(f => f.id === id);
-    if (func) {
-        func.visible = !func.visible;
-        updateFunctionList();
-        plotAdvancedGraph();
-    }
-}
-
-// Remove function from graph
-function removeFunction(id) {
-    activeFunctions = activeFunctions.filter(f => f.id !== id);
-    updateFunctionList();
-    plotAdvancedGraph();
-    showNotification('Function removed');
-}
-
-// Clear all functions
-function clearAllFunctions() {
-    if (activeFunctions.length === 0) return;
-    
-    if (confirm('Remove all functions from the graph?')) {
-        activeFunctions = [];
-        colorIndex = 0;
-        updateFunctionList();
-        plotAdvancedGraph();
-        showNotification('All functions cleared');
-    }
-}
-
-// Plot advanced graph with multiple functions
-function plotAdvancedGraph() {
-    const canvas = document.getElementById('advancedCanvas');
-    if (!canvas) {
-        console.error('Advanced canvas not found');
-        return;
-    }
-    
-    const ctx = canvas.getContext('2d');
-    
-    try {
-        // Get graph settings
-        const xMin = parseFloat(document.getElementById('advancedXMin')?.value) || -10;
-        const xMax = parseFloat(document.getElementById('advancedXMax')?.value) || 10;
-        const yMin = parseFloat(document.getElementById('advancedYMin')?.value) || -10;
-        const yMax = parseFloat(document.getElementById('advancedYMax')?.value) || 10;
-        
-        const showGrid = document.getElementById('advancedShowGrid')?.checked !== false;
-        
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Set up coordinate system
-        const padding = 40;
-        const graphWidth = canvas.width - 2 * padding;
-        const graphHeight = canvas.height - 2 * padding;
-        
-        // Coordinate transformation functions
-        const xToCanvas = (x) => padding + ((x - xMin) / (xMax - xMin)) * graphWidth;
-        const yToCanvas = (y) => canvas.height - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
-        
-        // Draw grid
-        if (showGrid) {
-            drawAdvancedGrid(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas);
-        }
-        
-        // Draw axes
-        drawAdvancedAxes(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas);
-        
-        // Draw all visible functions
-        activeFunctions.forEach(func => {
-            if (func.visible) {
-                drawFunctionCurve(ctx, func, xMin, xMax, xToCanvas, yToCanvas);
-            }
-        });
-        
-        // Draw labels
-        drawAdvancedLabels(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas);
-        
-        // Draw legend
-        drawAdvancedLegend(ctx, activeFunctions.filter(f => f.visible));
-        
-    } catch (error) {
-        console.error('Error plotting advanced graph:', error);
-        drawEmptyGraph(ctx);
-    }
-}
-
-// Draw empty graph
-function drawEmptyGraph(ctx) {
-    const canvas = ctx.canvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Default settings
-    const xMin = -10, xMax = 10, yMin = -10, yMax = 10;
-    const padding = 40;
-    const graphWidth = canvas.width - 2 * padding;
-    const graphHeight = canvas.height - 2 * padding;
-    
-    const xToCanvas = (x) => padding + ((x - xMin) / (xMax - xMin)) * graphWidth;
-    const yToCanvas = (y) => canvas.height - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
-    
-    drawAdvancedGrid(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas);
-    drawAdvancedAxes(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas);
-    drawAdvancedLabels(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas);
-    
-    // Add "No functions" message
-    ctx.fillStyle = '#64748b';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Add functions to see them graphed here', canvas.width / 2, canvas.height / 2);
-}
-
-// Draw advanced grid
-function drawAdvancedGrid(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas) {
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([2, 2]);
-    
-    // Vertical grid lines
-    const xStep = (xMax - xMin) / 20;
-    for (let x = Math.ceil(xMin / xStep) * xStep; x <= xMax; x += xStep) {
-        ctx.beginPath();
-        ctx.moveTo(xToCanvas(x), yToCanvas(yMin));
-        ctx.lineTo(xToCanvas(x), yToCanvas(yMax));
-        ctx.stroke();
-    }
-    
-    // Horizontal grid lines
-    const yStep = (yMax - yMin) / 15;
-    for (let y = Math.ceil(yMin / yStep) * yStep; y <= yMax; y += yStep) {
-        ctx.beginPath();
-        ctx.moveTo(xToCanvas(xMin), yToCanvas(y));
-        ctx.lineTo(xToCanvas(xMax), yToCanvas(y));
-        ctx.stroke();
-    }
-    
-    ctx.setLineDash([]);
-}
-
-// Draw advanced axes
-function drawAdvancedAxes(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas) {
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2;
-    
-    // X-axis
-    if (yMin <= 0 && yMax >= 0) {
-        ctx.beginPath();
-        ctx.moveTo(xToCanvas(xMin), yToCanvas(0));
-        ctx.lineTo(xToCanvas(xMax), yToCanvas(0));
-        ctx.stroke();
-    }
-    
-    // Y-axis
-    if (xMin <= 0 && xMax >= 0) {
-        ctx.beginPath();
-        ctx.moveTo(xToCanvas(0), yToCanvas(yMin));
-        ctx.lineTo(xToCanvas(0), yToCanvas(yMax));
-        ctx.stroke();
-    }
-}
-
-// Draw function curve
-function drawFunctionCurve(ctx, func, xMin, xMax, xToCanvas, yToCanvas) {
-    ctx.strokeStyle = func.color;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    
-    const steps = 2000;
-    const dx = (xMax - xMin) / steps;
-    
-    ctx.beginPath();
-    let firstPoint = true;
-    let lastY = null;
-    
-    for (let i = 0; i <= steps; i++) {
-        const x = xMin + i * dx;
-        
-        try {
-            const y = evaluateFunction(func.expression, x);
-            
-            // Skip if y is not a valid number or too large
-            if (!isFinite(y) || Math.abs(y) > 10000) {
-                firstPoint = true;
-                continue;
-            }
-            
-            const canvasX = xToCanvas(x);
-            const canvasY = yToCanvas(y);
-            
-            // Check for discontinuities
-            if (lastY !== null && Math.abs(y - lastY) > (yMax - yMin) * 0.5) {
-                firstPoint = true;
-            }
-            
-            if (firstPoint) {
-                ctx.moveTo(canvasX, canvasY);
-                firstPoint = false;
-            } else {
-                ctx.lineTo(canvasX, canvasY);
-            }
-            
-            lastY = y;
-        } catch (error) {
-            firstPoint = true;
-            lastY = null;
-        }
-    }
-    
-    ctx.stroke();
-}
-
-// Draw advanced labels
-function drawAdvancedLabels(ctx, xMin, xMax, yMin, yMax, xToCanvas, yToCanvas) {
-    ctx.fillStyle = '#1f2937';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    
-    // X-axis labels
-    const xStep = (xMax - xMin) / 10;
-    for (let x = Math.ceil(xMin / xStep) * xStep; x <= xMax; x += xStep) {
-        if (Math.abs(x) > 0.01) { // Skip zero
-            ctx.fillText(x.toFixed(1), xToCanvas(x), yToCanvas(0) + 20);
-        }
-    }
-    
-    // Y-axis labels
-    ctx.textAlign = 'right';
-    const yStep = (yMax - yMin) / 8;
-    for (let y = Math.ceil(yMin / yStep) * yStep; y <= yMax; y += yStep) {
-        if (Math.abs(y) > 0.01) { // Skip zero
-            ctx.fillText(y.toFixed(1), xToCanvas(0) - 10, yToCanvas(y) + 5);
-        }
-    }
-    
-    // Origin label
-    ctx.textAlign = 'right';
-    ctx.fillText('0', xToCanvas(0) - 10, yToCanvas(0) + 20);
-}
-
-// Draw advanced legend
-function drawAdvancedLegend(ctx, visibleFunctions) {
-    if (visibleFunctions.length === 0) return;
-    
-    const legendX = 20;
-    let legendY = 20;
-    const legendHeight = visibleFunctions.length * 25 + 20;
-    
-    // Background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.fillRect(legendX - 10, legendY - 10, 300, legendHeight);
-    
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(legendX - 10, legendY - 10, 300, legendHeight);
-    
-    // Function entries
-    visibleFunctions.forEach(func => {
-        // Function line
-        ctx.strokeStyle = func.color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(legendX, legendY);
-        ctx.lineTo(legendX + 20, legendY);
-        ctx.stroke();
-        
-        // Function label
-        ctx.fillStyle = '#1f2937';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        const displayExpr = func.expression.length > 30 ? 
-            func.expression.substring(0, 30) + '...' : func.expression;
-        ctx.fillText(`f(x) = ${displayExpr}`, legendX + 25, legendY + 4);
-        
-        legendY += 25;
-    });
-}
-
-// Initialize advanced graph interaction
-function initializeAdvancedGraphInteraction() {
-    const canvas = document.getElementById('advancedCanvas');
-    if (!canvas) return;
-    
-    canvas.addEventListener('mousemove', function(event) {
-        if (activeFunctions.length === 0) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-        
-        // Convert to graph coordinates
-        const xMin = parseFloat(document.getElementById('advancedXMin')?.value) || -10;
-        const xMax = parseFloat(document.getElementById('advancedXMax')?.value) || 10;
-        const yMin = parseFloat(document.getElementById('advancedYMin')?.value) || -10;
-        const yMax = parseFloat(document.getElementById('advancedYMax')?.value) || 10;
-        
-        const padding = 40;
-        const graphWidth = canvas.width - 2 * padding;
-        const graphHeight = canvas.height - 2 * padding;
-        
-        if (mouseX >= padding && mouseX <= canvas.width - padding &&
-            mouseY >= padding && mouseY <= canvas.height - padding) {
-            
-            const x = xMin + ((mouseX - padding) / graphWidth) * (xMax - xMin);
-            
-            // Show coordinates for the first visible function
-            const firstFunc = activeFunctions.find(f => f.visible);
-            if (firstFunc) {
-                try {
-                    const y = evaluateFunction(firstFunc.expression, x);
-                    canvas.title = `x = ${x.toFixed(3)}, y = ${y.toFixed(3)}`;
-                } catch (error) {
-                    canvas.title = `x = ${x.toFixed(3)}`;
-                }
-            }
-        }
-    });
-}
-
-// Auto scale advanced graph
-function autoScaleAdvancedGraph() {
-    if (activeFunctions.length === 0) {
-        showNotification('Please add functions first');
-        return;
-    }
-    
-    // Sample functions to find reasonable bounds
-    let minY = Infinity;
-    let maxY = -Infinity;
-    const xRange = 20;
-    
-    activeFunctions.filter(f => f.visible).forEach(func => {
-        for (let x = -xRange/2; x <= xRange/2; x += 0.1) {
-            try {
-                const y = evaluateFunction(func.expression, x);
-                if (isFinite(y) && Math.abs(y) < 1000) {
-                    minY = Math.min(minY, y);
-                    maxY = Math.max(maxY, y);
-                }
-            } catch (error) {
-                // Skip invalid points
-            }
-        }
-    });
-    
-    if (minY === Infinity || maxY === -Infinity) {
-        showNotification('Could not determine appropriate scale');
-        return;
-    }
-    
-    // Add padding
-    const yPadding = (maxY - minY) * 0.1;
-    minY -= yPadding;
-    maxY += yPadding;
-    
-    // Update inputs
-    const xMinInput = document.getElementById('advancedXMin');
-    const xMaxInput = document.getElementById('advancedXMax');
-    const yMinInput = document.getElementById('advancedYMin');
-    const yMaxInput = document.getElementById('advancedYMax');
-    
-    if (xMinInput) xMinInput.value = -xRange/2;
-    if (xMaxInput) xMaxInput.value = xRange/2;
-    if (yMinInput) yMinInput.value = minY.toFixed(1);
-    if (yMaxInput) yMaxInput.value = maxY.toFixed(1);
-    
-    // Replot
-    plotAdvancedGraph();
-    showNotification('Graph auto-scaled');
-}
-
-// Reset advanced graph view
-function resetAdvancedGraphView() {
-    const xMinInput = document.getElementById('advancedXMin');
-    const xMaxInput = document.getElementById('advancedXMax');
-    const yMinInput = document.getElementById('advancedYMin');
-    const yMaxInput = document.getElementById('advancedYMax');
-    const showGridInput = document.getElementById('advancedShowGrid');
-    
-    if (xMinInput) xMinInput.value = -10;
-    if (xMaxInput) xMaxInput.value = 10;
-    if (yMinInput) yMinInput.value = -10;
-    if (yMaxInput) yMaxInput.value = 10;
-    if (showGridInput) showGridInput.checked = true;
-    
-    plotAdvancedGraph();
-    showNotification('Graph view reset');
-}
-
-// Load function examples
-function loadFunctionExample(type) {
-    const examples = {
-        polynomial: 'x^3 - 2*x^2 + x - 1',
-        trigonometric: 'sin(x) + 0.5*cos(2*x)',
-        exponential: 'exp(x/2)',
-        logarithmic: 'ln(x + 1)',
-        complex: 'sin(x) * exp(-x/5)'
-    };
-    
-    const customInput = document.getElementById('customFunctionInput');
-    if (customInput && examples[type]) {
-        customInput.value = examples[type];
-        showNotification(`Loaded ${type} example`);
-    }
-}
-// Additional helper functions for the calculator
-
-// Load example function into custom input
-function loadExample(expression) {
-    const customInput = document.getElementById('customFunctionInput');
-    if (customInput) {
-        customInput.value = expression;
-        showNotification(`Loaded example: ${expression}`);
-    }
-}
-
-// Analyze functions at a specific point
-function analyzeAtPoint() {
-    const x = parseFloat(document.getElementById('analysisX').value);
-    const resultDiv = document.getElementById('analysisResult');
-    
-    if (isNaN(x)) {
-        resultDiv.innerHTML = '<p class="no-result">Please enter a valid x-value</p>';
-        return;
-    }
-    
-    if (activeFunctions.length === 0) {
-        resultDiv.innerHTML = '<p class="no-result">No functions to analyze. Add functions first.</p>';
-        return;
-    }
-    
-    let analysisHTML = `<strong>Analysis at x = ${x}:</strong><br><br>`;
-    
-    activeFunctions.filter(f => f.visible).forEach(func => {
-        try {
-            const y = evaluateFunction(func.expression, x);
-            analysisHTML += `
-                <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-light); border-radius: 8px; border-left: 4px solid ${func.color};">
-                    <strong>f(x) = ${func.expression}</strong><br>
-                    f(${x}) = ${isFinite(y) ? y.toFixed(6) : 'undefined'}
-                </div>
-            `;
-        } catch (error) {
-            analysisHTML += `
-                <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-light); border-radius: 8px; border-left: 4px solid ${func.color};">
-                    <strong>f(x) = ${func.expression}</strong><br>
-                    f(${x}) = <span style="color: var(--danger);">Error: ${error.message}</span>
-                </div>
-            `;
-        }
-    });
-    
-    resultDiv.innerHTML = analysisHTML;
-}
-
-// Zoom graph function
-function zoomGraph(factor) {
-    const xMinInput = document.getElementById('advancedXMin') || document.getElementById('graphXMin');
-    const xMaxInput = document.getElementById('advancedXMax') || document.getElementById('graphXMax');
-    const yMinInput = document.getElementById('advancedYMin') || document.getElementById('graphYMin');
-    const yMaxInput = document.getElementById('advancedYMax') || document.getElementById('graphYMax');
-    
-    if (!xMinInput || !xMaxInput || !yMinInput || !yMaxInput) return;
-    
-    const xMin = parseFloat(xMinInput.value) || -10;
-    const xMax = parseFloat(xMaxInput.value) || 10;
-    const yMin = parseFloat(yMinInput.value) || -10;
-    const yMax = parseFloat(yMaxInput.value) || 10;
-    
-    const xCenter = (xMin + xMax) / 2;
-    const yCenter = (yMin + yMax) / 2;
-    const xRange = (xMax - xMin) * factor / 2;
-    const yRange = (yMax - yMin) * factor / 2;
-    
-    xMinInput.value = (xCenter - xRange).toFixed(1);
-    xMaxInput.value = (xCenter + xRange).toFixed(1);
-    yMinInput.value = (yCenter - yRange).toFixed(1);
-    yMaxInput.value = (yCenter + yRange).toFixed(1);
-    
-    plotAdvancedGraph();
-    showNotification(factor < 1 ? 'Zoomed in' : 'Zoomed out');
-}
-
-// Auto fit graph
-function autoFitGraph() {
-    autoScaleAdvancedGraph();
-}
-
-// Reset advanced graph
-function resetAdvancedGraph() {
-    resetAdvancedGraphView();
-}
-
-// Load example functions
-function loadExampleFunctions() {
-    // Clear existing functions
-    activeFunctions = [];
-    colorIndex = 0;
-    
-    // Add some example functions
-    const examples = [
-        { expression: 'sin(x)', type: 'trigonometric' },
-        { expression: 'x^2 - 4', type: 'polynomial' },
-        { expression: 'exp(-x^2/2)', type: 'exponential' }
-    ];
-    
-    examples.forEach(example => {
-        const functionObj = {
-            id: Date.now() + Math.random(),
-            expression: example.expression,
-            color: graphColors[colorIndex % graphColors.length],
-            visible: true,
-            type: example.type
-        };
-        
-        activeFunctions.push(functionObj);
-        colorIndex++;
-    });
-    
-    updateFunctionList();
-    plotAdvancedGraph();
-    showNotification('Example functions loaded');
-}
-
-// Fix the combination function to handle edge cases better
-function combination(n, r) {
-    if (n < 0 || r < 0) throw new Error('Values must be non-negative');
-    if (r > n) return 0;
-    if (r === 0 || r === n) return 1;
-    
-    // Use the more efficient formula and handle large numbers
-    r = Math.min(r, n - r);
-    let result = 1;
-    for (let i = 0; i < r; i++) {
-        result = result * (n - i) / (i + 1);
-    }
-    return Math.round(result);
-}
-
-// Add missing polynomial functions that were referenced but not defined
-function formatPolynomial(coefficients, degree) {
-    let terms = [];
-    
-    for (let i = 0; i <= degree; i++) {
-        const coeff = coefficients[i];
-        const power = degree - i;
-        
-        if (coeff === 0) continue;
-        
-        let term = '';
-        
-        // Handle sign
-        if (terms.length > 0) {
-            term += coeff > 0 ? ' + ' : ' - ';
-        } else if (coeff < 0) {
-            term += '-';
-        }
-        
-        const absCoeff = Math.abs(coeff);
-        
-        // Handle coefficient
-        if (power === 0) {
-            term += absCoeff;
-        } else if (absCoeff === 1) {
-            if (power === 1) {
-                term += 'x';
-            } else {
-                term += `x^${power}`;
-            }
-        } else {
-            if (power === 1) {
-                term += `${absCoeff}x`;
-            } else {
-                term += `${absCoeff}x^${power}`;
-            }
-        }
-        
-        terms.push(term);
-    }
-    
-    return terms.length > 0 ? terms.join('') : '0';
-}
-
-// Add function to handle missing HTML elements gracefully
-function safeGetElement(id) {
-    const element = document.getElementById(id);
-    if (!element) {
-        console.warn(`Element with id '${id}' not found`);
-    }
-    return element;
-}
-
-// Enhanced error handling for mathematical operations
-function safeEvaluate(expression, x) {
-    try {
-        return evaluateFunction(expression, x);
-    } catch (error) {
-        console.warn(`Error evaluating ${expression} at x=${x}:`, error);
-        return NaN;
-    }
-}
-
-// Initialize missing elements when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Add missing input elements if they don't exist
-    const requiredInputs = [
-        { id: 'advancedXMin', defaultValue: '-10' },
-        { id: 'advancedXMax', defaultValue: '10' },
-        { id: 'advancedYMin', defaultValue: '-10' },
-        { id: 'advancedYMax', defaultValue: '10' },
-        { id: 'advancedShowGrid', type: 'checkbox', defaultChecked: true }
-    ];
-    
-    requiredInputs.forEach(input => {
-        if (!document.getElementById(input.id)) {
-            console.warn(`Missing input element: ${input.id}`);
-        }
-    });
-});
+// Export helper functions to window
+window.testGraphFunctionality = testGraphFunctionality;
+window.manualGraphTest = manualGraphTest;
+window.testGrapher = testGrapher;
+window.loadExample = loadExample;
+window.loadBinomialExample = loadBinomialExample;
+window.loadGraphExample = loadGraphExample;
+window.drawFunctionCurve = drawFunctionCurve;
 
 console.log('Calculator JavaScript loaded successfully');

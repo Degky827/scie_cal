@@ -128,8 +128,8 @@
                 <button class="btn btn-function" onclick="scientificFunction('exp')">e<sup>x</sup></button>
                 <button class="btn btn-function" onclick="scientificFunction('10^')">10<sup>x</sup></button>
 
-                <button class="btn btn-function" onclick="appendFunction('sqrt')">√</button>
-                <button class="btn btn-function" onclick="appendFunction('cbrt')">∛</button>
+                <button class="btn btn-function" onclick="scientificFunction('sqrt')">√</button>
+                <button class="btn btn-function" onclick="scientificFunction('cbrt')">∛</button>
                 <button class="btn btn-function" onclick="appendOperator('^')">x<sup>y</sup></button>
                 <button class="btn btn-function" onclick="scientificFunction('square')">x²</button>
                 <button class="btn btn-function" onclick="scientificFunction('cube')">x³</button>
@@ -860,22 +860,22 @@
                 <div class="combinatorics-section">
                     <h3><i class="fas fa-lightbulb"></i> Binomial Examples & Patterns</h3>
                     <div class="examples-grid">
-                        <div class="example-card" onclick="loadExample('x', '-4/x', 6)">
+                        <div class="example-card" onclick="loadBinomialExample('x', '-4/x', 6)">
                             <h4>(x - 4/x)^6</h4>
                             <p>Find constant term</p>
                             <small>Classic fractional binomial</small>
                         </div>
-                        <div class="example-card" onclick="loadExample('2x', '-3/x', 5)">
+                        <div class="example-card" onclick="loadBinomialExample('2x', '-3/x', 5)">
                             <h4>(2x - 3/x)^5</h4>
                             <p>Coefficient variations</p>
                             <small>Mixed coefficients</small>
                         </div>
-                        <div class="example-card" onclick="loadExample('x^2', '1/x', 9)">
+                        <div class="example-card" onclick="loadBinomialExample('x^2', '1/x', 9)">
                             <h4>(x² + 1/x)^9</h4>
                             <p>Higher powers</p>
                             <small>x² terms</small>
                         </div>
-                        <div class="example-card" onclick="loadExample('3x', '-2', 4)">
+                        <div class="example-card" onclick="loadBinomialExample('3x', '-2', 4)">
                             <h4>(3x - 2)^4</h4>
                             <p>Standard binomial</p>
                             <small>No fractions</small>
