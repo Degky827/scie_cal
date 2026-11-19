@@ -9,13 +9,13 @@ const CORE_ASSETS = [
   './calculate.js',
   './calculate.css',
   './manifest.json',
-  './favicon.ico',
-  './icon-16.png',
-  './icon-32.png',
-  './icon-192.png',
-  './icon-512.png',
-  './screenshot-wide.png',
-  './screenshot-narrow.png'
+  './images/favicon.ico',
+  './images/icon-16.png',
+  './images/icon-32.png',
+  './images/icon-192.png',
+  './images/icon-512.png',
+  './images/screenshot-wide.png',
+  './images/screenshot-narrow.png'
 ];
 
 // External CDN dependencies (math.js, Font Awesome CSS and webfonts)
@@ -137,8 +137,8 @@ self.addEventListener('sync', event => {
 self.addEventListener('push', event => {
   const options = {
     body: event.data ? event.data.text() : 'Calculator notification',
-    icon: 'icon-192.png',
-    badge: 'icon-192.png'
+    icon: 'images/icon-192.png',
+    badge: 'images/icon-192.png'
   };
 
   event.waitUntil(
