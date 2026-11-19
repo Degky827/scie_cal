@@ -161,6 +161,17 @@ function switchMode(mode) {
     }
 }
 
+// Toggle Basic Keypad inside Advanced Mode
+function toggleAdvancedBasicKeypad() {
+    const sec = document.getElementById('advancedBasicSection');
+    const btn = document.getElementById('btnToggleBasicKeypad');
+    const text = document.getElementById('toggleBasicKeypadText');
+    if (!sec) return;
+    const isHidden = sec.classList.toggle('hidden');
+    if (btn) btn.classList.toggle('active', !isHidden);
+    if (text) text.textContent = isHidden ? 'Basic Pad: OFF' : 'Basic Pad: ON';
+}
+
 // Universal Sub-Tab Switcher for uncluttered navigation
 function switchSubTab(modeId, tabId) {
     const modeEl = document.getElementById(modeId);
@@ -8857,5 +8868,6 @@ window.updateSetting = updateSetting;
 window.resetCalculatorSettings = resetCalculatorSettings;
 window.openHamburgerMenu = openHamburgerMenu;
 window.closeHamburgerMenu = closeHamburgerMenu;
+window.toggleAdvancedBasicKeypad = toggleAdvancedBasicKeypad;
 
 console.log('Calculator JavaScript loaded successfully');

@@ -119,42 +119,104 @@
             </div>
 
             <!-- Advanced Mode Buttons -->
-            <div class="buttons-grid advanced-grid hidden" id="advancedMode">
-                <button class="btn btn-function" onclick="scientificFunction('sin')">sin</button>
-                <button class="btn btn-function" onclick="scientificFunction('cos')">cos</button>
-                <button class="btn btn-function" onclick="scientificFunction('tan')">tan</button>
-                <button class="btn btn-function" onclick="scientificFunction('log')">log</button>
-                <button class="btn btn-function" onclick="scientificFunction('ln')">ln</button>
+            <div class="advanced-mode-wrapper hidden" id="advancedMode">
+                <!-- Advanced Mode Toolbar with Basic Quick-Access Buttons -->
+                <div class="advanced-toolbar">
+                    <div class="advanced-toolbar-left">
+                        <span class="advanced-badge"><i class="fas fa-atom"></i> Scientific Functions</span>
+                    </div>
+                    <div class="advanced-toolbar-right">
+                        <button class="btn-adv-tool active" id="btnToggleBasicKeypad" onclick="toggleAdvancedBasicKeypad()" title="Toggle Basic Keypad in Advanced Mode">
+                            <i class="fas fa-calculator"></i> <span id="toggleBasicKeypadText">Basic Pad: ON</span>
+                        </button>
+                        <button class="btn-adv-tool" onclick="switchMode('basic')" title="Switch to Basic Calculator Mode">
+                            <i class="fas fa-arrow-left"></i> Basic Mode
+                        </button>
+                    </div>
+                </div>
 
-                <button class="btn btn-function" onclick="scientificFunction('asin')">sin⁻¹</button>
-                <button class="btn btn-function" onclick="scientificFunction('acos')">cos⁻¹</button>
-                <button class="btn btn-function" onclick="scientificFunction('atan')">tan⁻¹</button>
-                <button class="btn btn-function" onclick="scientificFunction('exp')">e<sup>x</sup></button>
-                <button class="btn btn-function" onclick="scientificFunction('10^')">10<sup>x</sup></button>
+                <!-- Scientific Functions Keypad -->
+                <div class="buttons-grid advanced-grid" id="advancedScientificGrid">
+                    <button class="btn btn-function" onclick="scientificFunction('sin')">sin</button>
+                    <button class="btn btn-function" onclick="scientificFunction('cos')">cos</button>
+                    <button class="btn btn-function" onclick="scientificFunction('tan')">tan</button>
+                    <button class="btn btn-function" onclick="scientificFunction('log')">log</button>
+                    <button class="btn btn-function" onclick="scientificFunction('ln')">ln</button>
 
-                <button class="btn btn-function" onclick="scientificFunction('sinh')">sinh</button>
-                <button class="btn btn-function" onclick="scientificFunction('cosh')">cosh</button>
-                <button class="btn btn-function" onclick="scientificFunction('tanh')">tanh</button>
-                <button class="btn btn-function" onclick="scientificFunction('log2')">log₂</button>
-                <button class="btn btn-function" onclick="scientificFunction('toFraction')" title="Convert between decimal and fraction">a/b</button>
+                    <button class="btn btn-function" onclick="scientificFunction('asin')">sin⁻¹</button>
+                    <button class="btn btn-function" onclick="scientificFunction('acos')">cos⁻¹</button>
+                    <button class="btn btn-function" onclick="scientificFunction('atan')">tan⁻¹</button>
+                    <button class="btn btn-function" onclick="scientificFunction('exp')">e<sup>x</sup></button>
+                    <button class="btn btn-function" onclick="scientificFunction('10^')">10<sup>x</sup></button>
 
-                <button class="btn btn-function" onclick="scientificFunction('sqrt')">√</button>
-                <button class="btn btn-function" onclick="scientificFunction('cbrt')">∛</button>
-                <button class="btn btn-function" onclick="appendOperator('^')">x<sup>y</sup></button>
-                <button class="btn btn-function" onclick="scientificFunction('square')">x²</button>
-                <button class="btn btn-function" onclick="scientificFunction('cube')">x³</button>
+                    <button class="btn btn-function" onclick="scientificFunction('sinh')">sinh</button>
+                    <button class="btn btn-function" onclick="scientificFunction('cosh')">cosh</button>
+                    <button class="btn btn-function" onclick="scientificFunction('tanh')">tanh</button>
+                    <button class="btn btn-function" onclick="scientificFunction('log2')">log₂</button>
+                    <button class="btn btn-function" onclick="scientificFunction('toFraction')" title="Convert between decimal and fraction">a/b</button>
 
-                <button class="btn btn-function" onclick="scientificFunction('factorial')">n!</button>
-                <button class="btn btn-function" onclick="scientificFunction('abs')">|x|</button>
-                <button class="btn btn-function" onclick="appendConstant('pi')">π</button>
-                <button class="btn btn-function" onclick="appendConstant('e')">e</button>
-                <button class="btn btn-function" onclick="toggleSign()">±</button>
+                    <button class="btn btn-function" onclick="scientificFunction('sqrt')">√</button>
+                    <button class="btn btn-function" onclick="scientificFunction('cbrt')">∛</button>
+                    <button class="btn btn-function" onclick="appendOperator('^')">x<sup>y</sup></button>
+                    <button class="btn btn-function" onclick="scientificFunction('square')">x²</button>
+                    <button class="btn btn-function" onclick="scientificFunction('cube')">x³</button>
 
-                <button class="btn btn-function" onclick="appendFunction('(')">(</button>
-                <button class="btn btn-function" onclick="appendFunction(')')">)</button>
-                <button class="btn btn-operator" onclick="appendOperator('mod')">mod</button>
-                <button class="btn btn-function" onclick="scientificFunction('reciprocal')">1/x</button>
-                <button class="btn btn-function" onclick="toggleAngleMode()" id="angleMode">DEG</button>
+                    <button class="btn btn-function" onclick="scientificFunction('factorial')">n!</button>
+                    <button class="btn btn-function" onclick="scientificFunction('abs')">|x|</button>
+                    <button class="btn btn-function" onclick="appendConstant('pi')">π</button>
+                    <button class="btn btn-function" onclick="appendConstant('e')">e</button>
+                    <button class="btn btn-function" onclick="toggleSign()">±</button>
+
+                    <button class="btn btn-function" onclick="appendFunction('(')">(</button>
+                    <button class="btn btn-function" onclick="appendFunction(')')">)</button>
+                    <button class="btn btn-operator" onclick="appendOperator('mod')">mod</button>
+                    <button class="btn btn-function" onclick="scientificFunction('reciprocal')">1/x</button>
+                    <button class="btn btn-function" onclick="toggleAngleMode()" id="angleMode">DEG</button>
+                </div>
+
+                <!-- Integrated Basic Keypad in Advanced Mode -->
+                <div class="advanced-basic-section" id="advancedBasicSection">
+                    <div class="advanced-basic-header">
+                        <span><i class="fas fa-th"></i> Basic Keypad</span>
+                        <span class="advanced-basic-hint">Numbers & Arithmetic</span>
+                    </div>
+                    <div class="buttons-grid advanced-basic-grid" id="advancedBasicGrid">
+                        <!-- Row 1: Clear & Delete -->
+                        <button class="btn btn-function btn-clear" onclick="clearAll()">AC</button>
+                        <button class="btn btn-function" onclick="clearEntry()">CE</button>
+                        <button class="btn btn-function" onclick="backspace()" aria-label="Backspace"><i class="fas fa-backspace"></i></button>
+                        <button class="btn btn-function" onclick="appendFunction('(')">(</button>
+                        <button class="btn btn-function" onclick="appendFunction(')')">)</button>
+
+                        <!-- Row 2: 7 8 9 ÷ % -->
+                        <button class="btn btn-number" onclick="appendNumber('7')">7</button>
+                        <button class="btn btn-number" onclick="appendNumber('8')">8</button>
+                        <button class="btn btn-number" onclick="appendNumber('9')">9</button>
+                        <button class="btn btn-operator" onclick="appendOperator('/')">÷</button>
+                        <button class="btn btn-function" onclick="percentage()">%</button>
+
+                        <!-- Row 3: 4 5 6 × 1/x -->
+                        <button class="btn btn-number" onclick="appendNumber('4')">4</button>
+                        <button class="btn btn-number" onclick="appendNumber('5')">5</button>
+                        <button class="btn btn-number" onclick="appendNumber('6')">6</button>
+                        <button class="btn btn-operator" onclick="appendOperator('*')">×</button>
+                        <button class="btn btn-function" onclick="scientificFunction('reciprocal')">1/x</button>
+
+                        <!-- Row 4: 1 2 3 − ± -->
+                        <button class="btn btn-number" onclick="appendNumber('1')">1</button>
+                        <button class="btn btn-number" onclick="appendNumber('2')">2</button>
+                        <button class="btn btn-number" onclick="appendNumber('3')">3</button>
+                        <button class="btn btn-operator" onclick="appendOperator('-')">−</button>
+                        <button class="btn btn-function" onclick="toggleSign()">±</button>
+
+                        <!-- Row 5: 0 . π + = -->
+                        <button class="btn btn-number" onclick="appendNumber('0')">0</button>
+                        <button class="btn btn-number" onclick="appendNumber('.')">.</button>
+                        <button class="btn btn-function" onclick="appendConstant('pi')">π</button>
+                        <button class="btn btn-operator" onclick="appendOperator('+')">+</button>
+                        <button class="btn btn-equals" onclick="calculate()">=</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Calculus Mode -->

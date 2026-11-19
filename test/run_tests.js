@@ -88,7 +88,41 @@ const mockDOM = {
       contains(c) { return mockDOM.menuBackdrop.classes.has(c); }
     },
     style: {}
-  }
+  },
+  advancedBasicSection: {
+    classes: new Set(),
+    classList: {
+      add(c) { mockDOM.advancedBasicSection.classes.add(c); },
+      remove(c) { mockDOM.advancedBasicSection.classes.delete(c); },
+      toggle(c) {
+        if (mockDOM.advancedBasicSection.classes.has(c)) {
+          mockDOM.advancedBasicSection.classes.delete(c);
+          return false;
+        } else {
+          mockDOM.advancedBasicSection.classes.add(c);
+          return true;
+        }
+      },
+      contains(c) { return mockDOM.advancedBasicSection.classes.has(c); }
+    },
+    style: {}
+  },
+  btnToggleBasicKeypad: {
+    classes: new Set(['active']),
+    classList: {
+      add(c) { mockDOM.btnToggleBasicKeypad.classes.add(c); },
+      remove(c) { mockDOM.btnToggleBasicKeypad.classes.delete(c); },
+      toggle(c, force) {
+        if (force === undefined) force = !mockDOM.btnToggleBasicKeypad.classes.has(c);
+        if (force) mockDOM.btnToggleBasicKeypad.classes.add(c);
+        else mockDOM.btnToggleBasicKeypad.classes.delete(c);
+        return force;
+      },
+      contains(c) { return mockDOM.btnToggleBasicKeypad.classes.has(c); }
+    },
+    style: {}
+  },
+  toggleBasicKeypadText: { textContent: 'Basic Pad: ON', style: {} }
 };
 
 let capturedListeners = {};
@@ -464,6 +498,28 @@ async function runAllTests() {
   assert(cssContent.includes('handTapBounce'), 'CSS includes @keyframes handTapBounce for tactile button tapping animation');
   assert(cssContent.includes('floorPulse'), 'CSS includes @keyframes floorPulse for neon floor glow');
   assert(cssContent.includes('@media (max-width: 600px)') && cssContent.includes('.pwa-install-container'), 'CSS includes responsive mobile scaling for the install button');
+
+  console.log('\n--- Step 11: Advanced Page Integrated Basic Keypad & Toolbar ---');
+  // 1. Structure Verification
+  assert(htmlContent.includes('advanced-toolbar') && htmlContent.includes('btnToggleBasicKeypad'), 'Advanced mode toolbar features Basic Pad toggle button');
+  assert(htmlContent.includes("switchMode('basic')"), 'Advanced mode includes quick-switch button to Basic mode');
+  assert(htmlContent.includes('advanced-basic-section') && htmlContent.includes('advancedBasicGrid'), 'Advanced mode contains integrated basic keypad grid');
+  assert(htmlContent.includes('advanced-basic-grid') && htmlContent.includes("appendNumber('7')"), 'Advanced basic keypad contains numeric buttons (0-9)');
+  assert(htmlContent.includes('advanced-basic-grid') && htmlContent.includes("calculate()"), 'Advanced basic keypad contains equals button');
+  assert(htmlContent.includes('advanced-basic-grid') && htmlContent.includes("clearAll()"), 'Advanced basic keypad contains AC button');
+
+  // 2. CSS Styles
+  assert(cssContent.includes('.advanced-toolbar') && cssContent.includes('.btn-adv-tool'), 'CSS contains styling for advanced toolbar and tools');
+  assert(cssContent.includes('.advanced-basic-section') && cssContent.includes('.advanced-basic-grid'), 'CSS contains styling for integrated basic keypad');
+
+  // 3. Execution: toggleAdvancedBasicKeypad
+  assert(typeof toggleAdvancedBasicKeypad === 'function', 'toggleAdvancedBasicKeypad is defined as a function');
+  toggleAdvancedBasicKeypad();
+  assert(mockDOM['advancedBasicSection'].classList.contains('hidden'), 'toggleAdvancedBasicKeypad hides section when toggled once');
+  assert(mockDOM['toggleBasicKeypadText'].textContent === 'Basic Pad: OFF', 'toggle text updates to Basic Pad: OFF');
+  toggleAdvancedBasicKeypad();
+  assert(!mockDOM['advancedBasicSection'].classList.contains('hidden'), 'toggleAdvancedBasicKeypad reveals section when toggled twice');
+  assert(mockDOM['toggleBasicKeypadText'].textContent === 'Basic Pad: ON', 'toggle text updates to Basic Pad: ON');
 
   console.log('\n====================================================');
   console.log(`  SUMMARY: ALL ${totalPassed} TESTS PASSED PERFECTLY! (0 Failed)`);
