@@ -7,48 +7,99 @@ console.log('====================================================\n');
 
 // Mock browser globals for Node.js test environment
 const mockDOM = {
-  mainDisplay: { textContent: '' },
-  historyDisplay: { textContent: '' },
-  expressionDisplay: { textContent: '' },
-  memoryValue: { textContent: '' },
-  historyList: { innerHTML: '' },
-  functionList: { innerHTML: '' },
-  gpaBreakdown: { innerHTML: '' },
-  gradeChart: { innerHTML: '' },
-  numCourses: { value: '1' },
-  gpaScale: { value: '4.0' },
-  graphAngleMode: { value: 'radians' },
-  graphXMin: { value: '-10' },
-  graphXMax: { value: '10' },
-  graphYMin: { value: '-10' },
-  graphYMax: { value: '10' },
-  xMin: { value: '-10' },
-  xMax: { value: '10' },
-  yMin: { value: '-10' },
-  yMax: { value: '10' },
-  graphResolution: { value: '1000' },
-  showAdvancedGrid: { checked: true },
-  showAxes: { checked: true },
-  showLabels: { checked: true },
-  showZeros: { checked: false },
-  derivativeInput: { value: 't^2 + 3*t' },
-  derivativePoint: { value: '2' },
-  derivativeResult: { innerHTML: '' },
-  integralInput: { value: 'x^2' },
-  integralLower: { value: '2' },
-  integralUpper: { value: '0' },
-  integralResult: { innerHTML: '' },
-  equationInput: { value: 'x^2 - 4 = 0' },
-  equationResult: { innerHTML: '' }
+  mainDisplay: { textContent: '', style: {} },
+  historyDisplay: { textContent: '', style: {} },
+  expressionDisplay: { textContent: '', style: {} },
+  memoryValue: { textContent: '', style: {} },
+  historyList: { innerHTML: '', style: {} },
+  functionList: { innerHTML: '', style: {} },
+  coursesContainer: { innerHTML: '', querySelectorAll: () => [], appendChild: () => {}, style: {} },
+  largeMatrixViewer: { innerHTML: '', style: {} },
+  gpaBreakdown: { innerHTML: '', style: {} },
+  gradeChart: { innerHTML: '', style: {} },
+  numCourses: { value: '1', style: {} },
+  gpaScale: { value: '4.0', style: {} },
+  graphAngleMode: { value: 'radians', style: {} },
+  graphXMin: { value: '-10', style: {} },
+  graphXMax: { value: '10', style: {} },
+  graphYMin: { value: '-10', style: {} },
+  graphYMax: { value: '10', style: {} },
+  xMin: { value: '-10', style: {} },
+  xMax: { value: '10', style: {} },
+  yMin: { value: '-10', style: {} },
+  yMax: { value: '10', style: {} },
+  graphResolution: { value: '1000', style: {} },
+  showAdvancedGrid: { checked: true, style: {} },
+  showAxes: { checked: true, style: {} },
+  showLabels: { checked: true, style: {} },
+  showZeros: { checked: false, style: {} },
+  derivativeInput: { value: 't^2 + 3*t', style: {} },
+  derivativePoint: { value: '2', style: {} },
+  derivativeResult: { innerHTML: '', style: {} },
+  integralInput: { value: 'x^2', style: {} },
+  integralLower: { value: '2', style: {} },
+  integralUpper: { value: '0', style: {} },
+  integralResult: { innerHTML: '', style: {} },
+  equationInput: { value: 'x^2 - 4 = 0', style: {} },
+  equationResult: { innerHTML: '', style: {} },
+  matrixARows: { value: '4', style: {} },
+  matrixACols: { value: '5', style: {} },
+  matrixBRows: { value: '5', style: {} },
+  matrixBCols: { value: '2', style: {} },
+  badgeMatrixA: { textContent: '', style: {} },
+  badgeMatrixB: { textContent: '', style: {} },
+  matrixInputsA: { innerHTML: '', style: {} },
+  matrixInputsB: { innerHTML: '', style: {} },
+  matrixResult: { innerHTML: '', style: {} },
+  matrixOperationSelect: { value: 'multiply', style: {} },
+  limitInput: { value: 'sin(x)/x', style: {} },
+  limitPoint: { value: '0', style: {} },
+  limitDirection: { value: 'both', style: {} },
+  limitResult: { innerHTML: '', style: {} },
+  taylorInput: { value: 'sin(x)', style: {} },
+  taylorCenter: { value: '0', style: {} },
+  taylorOrder: { value: '3', style: {} },
+  taylorResult: { innerHTML: '', style: {} },
+  advCombType: { value: 'catalan', style: {} },
+  advCombN: { value: '5', style: {} },
+  advCombR: { value: '3', style: {} },
+  advCombResult: { innerHTML: '', style: {} },
+  advCombRGroup: { style: { display: 'none' } },
+  settingsModalBackdrop: { classList: { add: () => {}, remove: () => {}, contains: () => false }, style: {} },
+  settingAngleUnit: { value: 'deg', style: {} },
+  settingPrecision: { value: '12', style: {} },
+  settingNotation: { value: 'auto', style: {} },
+  settingDetailedErrors: { value: 'true', style: {} },
+  hamburgerMenu: {
+    classes: new Set(['hidden']),
+    classList: {
+      add(c) { mockDOM.hamburgerMenu.classes.add(c); },
+      remove(c) { mockDOM.hamburgerMenu.classes.delete(c); },
+      contains(c) { return mockDOM.hamburgerMenu.classes.has(c); }
+    },
+    setAttribute: () => {},
+    style: {}
+  },
+  menuBackdrop: {
+    classes: new Set(),
+    classList: {
+      add(c) { mockDOM.menuBackdrop.classes.add(c); },
+      remove(c) { mockDOM.menuBackdrop.classes.delete(c); },
+      contains(c) { return mockDOM.menuBackdrop.classes.has(c); }
+    },
+    style: {}
+  }
 };
 
 let capturedListeners = {};
 global.document = {
-  getElementById: (id) => mockDOM[id] || { textContent: '', innerHTML: '', value: '', checked: false, addEventListener: () => {} },
+  getElementById: (id) => mockDOM[id] || { style: {}, classList: { add: () => {}, remove: () => {}, contains: () => false }, textContent: '', innerHTML: '', value: '', checked: false, addEventListener: () => {}, querySelectorAll: () => [], appendChild: () => {}, setAttribute: () => {} },
   querySelectorAll: () => [],
+  querySelector: () => null,
   addEventListener: (event, handler) => { capturedListeners[event] = handler; },
-  createElement: () => ({ style: {}, appendChild: () => {}, setAttribute: () => {}, focus: () => {} }),
-  head: { appendChild: () => {} }
+  createElement: () => ({ style: {}, classList: { add: () => {}, remove: () => {}, contains: () => false }, appendChild: () => {}, remove: () => {}, setAttribute: () => {}, focus: () => {} }),
+  head: { appendChild: () => {} },
+  body: { appendChild: () => {}, removeChild: () => {} }
 };
 
 global.localStorage = {
@@ -202,6 +253,217 @@ async function runAllTests() {
   assert(VectorOps.dot(u, v) === 32, 'Vector dot product [1,2,3] · [4,5,6] = 32');
   const cross = VectorOps.cross(u, v);
   assert(cross[0] === -3 && cross[1] === 6 && cross[2] === -3, 'Vector cross product [1,2,3] × [4,5,6] = [-3, 6, -3]');
+
+  console.log('\n--- Step 7: Sub-Navigation, Unlimited GPA & 100x100 Matrix Engine ---');
+
+  // Sub-Tab Switcher
+  const mockTabBtn1 = { getAttribute: (a) => a === 'data-tab' ? 'tab1' : null, classList: { toggle: (cls, on) => { mockTabBtn1.active = on; } } };
+  const mockTabBtn2 = { getAttribute: (a) => a === 'data-tab' ? 'tab2' : null, classList: { toggle: (cls, on) => { mockTabBtn2.active = on; } } };
+  const mockTabContent1 = { id: 'tab1', classList: { remove: () => { mockTabContent1.hidden = false; }, add: () => { mockTabContent1.hidden = true; } } };
+  const mockTabContent2 = { id: 'tab2', classList: { remove: () => { mockTabContent2.hidden = false; }, add: () => { mockTabContent2.hidden = true; } } };
+  const mockModeEl = {
+    querySelectorAll: (sel) => sel === '.sub-tab-btn' ? [mockTabBtn1, mockTabBtn2] : (sel === '.sub-tab-content' ? [mockTabContent1, mockTabContent2] : []),
+    querySelector: () => null
+  };
+  mockDOM['testMode'] = mockModeEl;
+  switchSubTab('testMode', 'tab2');
+  assert(mockTabBtn2.active === true && mockTabBtn1.active === false, 'Sub-tab buttons toggled active correctly');
+  assert(mockTabContent2.hidden === false && mockTabContent1.hidden === true, 'Sub-tab content pane switched visibility correctly');
+
+  // Unlimited GPA Courses
+  mockDOM['numCourses'].value = '7';
+  addCourse();
+  assert(parseInt(mockDOM['numCourses'].value) === 8, 'GPA dynamic course addition passes 7 courses limit (now 8)');
+  addCourse();
+  addCourse();
+  assert(parseInt(mockDOM['numCourses'].value) === 10, 'GPA dynamic course addition reaches 10 courses');
+
+  // Large Matrix Engine (100x100)
+  const matA = generateRandomLargeMatrix('A', 100, 100, -10, 10, true);
+  assert(matA.length === 100 && matA[0].length === 100, '100x100 matrix generated with 10,000 cells');
+  assert(largeMatrixState.A.rows === 100 && largeMatrixState.A.cols === 100, 'Matrix A dimensions correctly recorded as 100x100');
+
+  const matI = setLargeIdentity('B', 100);
+  assert(matI.length === 100 && matI[0][0] === 1 && matI[0][1] === 0, '100x100 identity matrix verified');
+
+  const tStart = Date.now();
+  const prod = multiplyLargeMatricesOp();
+  const tEnd = Date.now();
+  assert(prod !== null && prod.length === 100 && prod[0].length === 100, '100x100 matrix multiplication executed');
+  assert(tEnd - tStart < 200, `100x100 matrix multiplication executed in ${tEnd - tStart}ms (< 200ms)`);
+
+  // Verify A * I = A
+  let isIdentityProd = true;
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 10; c++) {
+      if (Math.abs(prod[r][c] - matA[r][c]) > 1e-9) {
+        isIdentityProd = false;
+        break;
+      }
+    }
+  }
+  assert(isIdentityProd, '100x100 Matrix multiplication identity property verified: A × I = A');
+
+  // Transpose of 100x100
+  const transA = transposeLargeMatrixOp('A');
+  assert(transA[0][1] === matA[1][0] && transA[50][25] === matA[25][50], '100x100 Matrix transpose property verified: Aᵀ[j][i] = A[i][j]');
+
+  console.log('\n--- Step 8: Arbitrary Matrix, Detailed Errors, Math Extensions & Settings ---');
+  
+  // 1. HTML Verification: Back button, Install pointer, Settings modal
+  const htmlContent = fs.readFileSync(path.join(__dirname, '../calculate.htm'), 'utf8');
+  assert(htmlContent.includes('btn-back-history') && htmlContent.includes('toggleHistory()'), 'Permanent Back button exists in History header');
+  assert(htmlContent.includes('fa-hand-pointer') && htmlContent.includes('install-pointer-icon'), 'Install App buttons feature animated pointer finger icon');
+  assert(htmlContent.includes('settingsModalBackdrop') && htmlContent.includes('settingAngleUnit'), 'Settings modal backdrop & controls present in HTML');
+
+  // 2. Arbitrary Rectangular Matrix (e.g. 4x5 * 5x2 = 4x2)
+  const dimsA = getMatrixDimensions('A');
+  const dimsB = getMatrixDimensions('B');
+  assert(dimsA.rows === 4 && dimsA.cols === 5, 'Matrix A dimensions correctly read as arbitrary 4×5');
+  assert(dimsB.rows === 5 && dimsB.cols === 2, 'Matrix B dimensions correctly read as arbitrary 5×2');
+  
+  const matrixA_test = [
+    [1, 2, 3, 4, 5],
+    [2, 0, 1, 1, 0],
+    [0, 1, 0, 2, 1],
+    [1, 1, 1, 1, 1]
+  ];
+  const matrixB_test = [
+    [1, 0],
+    [0, 1],
+    [1, 1],
+    [0, 2],
+    [1, 0]
+  ];
+  const multRes = matrixMultiply(matrixA_test, matrixB_test);
+  assert(multRes.length === 4 && multRes[0].length === 2, 'Rectangular matrix product A(4×5) × B(5×2) produces 4×2 result');
+  assert(multRes[0][0] === 9 && multRes[0][1] === 13, 'Rectangular matrix multiplication computed exact cell values [9, 13]');
+
+  // 3. Matrix Dimension Mismatch & Non-Square Guards with Explanatory Errors
+  let detErrThrown = false;
+  try {
+    determinant(matrixA_test);
+  } catch (err) {
+    detErrThrown = true;
+    assert(err.message.includes('Square Matrix Required'), 'Determinant correctly throws detailed error for rectangular 4×5 matrix');
+  }
+  assert(detErrThrown, 'Determinant guard on non-square matrix triggered');
+
+  // 4. Detailed Error Explanations in Basic/Advanced Evaluation
+  const divZeroErr = getDetailedErrorMessage(new Error('Division by zero'), '10 / 0');
+  assert(divZeroErr.includes('Math Error: Division by zero'), 'Detailed error identifies division by zero');
+
+  const unclosedParenErr = getDetailedErrorMessage(new Error('Syntax'), '(2 + 3 * (4 - 1)');
+  assert(unclosedParenErr.includes('Syntax Error: Unmatched parentheses'), 'Detailed error identifies unmatched parentheses');
+
+  const negSqrtErr = getDetailedErrorMessage(new Error('Domain'), 'sqrt(-25)');
+  assert(negSqrtErr.includes('Domain Error: Negative square root'), 'Detailed error identifies negative square root');
+
+  // 5. Advanced Math: Hyperbolics, log2, Fraction Conversion
+  clearAll();
+  scientificFunction('sinh');
+  assert(mockDOM.mainDisplay.textContent === '0', 'sinh(0) evaluates to 0');
+
+  clearAll();
+  scientificFunction('cosh');
+  assert(mockDOM.mainDisplay.textContent === '1', 'cosh(0) evaluates to 1');
+
+  clearAll();
+  appendNumber('8');
+  scientificFunction('log2');
+  assert(mockDOM.mainDisplay.textContent === '3', 'log2(8) evaluates to 3');
+
+  const fracVal = decimalToFraction(0.75);
+  assert(fracVal === '3/4', 'decimalToFraction(0.75) converts to 3/4');
+  const toggleBack = decimalToFraction('3/4');
+  assert(toggleBack === '0.75', 'decimalToFraction("3/4") toggles back to 0.75');
+
+  // 6. Calculus: Limits
+  mockDOM['limitInput'].value = 'sin(x)/x';
+  mockDOM['limitPoint'].value = '0';
+  mockDOM['limitDirection'].value = 'both';
+  calculateLimit();
+  assert(mockDOM['limitResult'].innerHTML.includes('1'), 'Limit lim_{x→0} sin(x)/x evaluates to 1');
+
+  // 7. Advanced Combinatorics: Catalan, Derangements, Repetition, Bell
+  mockDOM['advCombType'].value = 'catalan';
+  mockDOM['advCombN'].value = '5';
+  calculateAdvancedCombinatorics();
+  assert(mockDOM['advCombResult'].innerHTML.includes('42'), 'Catalan number C_5 evaluates to 42');
+
+  mockDOM['advCombType'].value = 'derangements';
+  mockDOM['advCombN'].value = '5';
+  calculateAdvancedCombinatorics();
+  assert(mockDOM['advCombResult'].innerHTML.includes('44'), 'Subfactorial !5 derangements evaluates to 44');
+
+  mockDOM['advCombType'].value = 'repetition';
+  mockDOM['advCombN'].value = '5';
+  mockDOM['advCombR'].value = '3';
+  calculateAdvancedCombinatorics();
+  assert(mockDOM['advCombResult'].innerHTML.includes('35'), 'Combinations with repetition CR(5,3) evaluates to 35');
+
+  mockDOM['advCombType'].value = 'bell';
+  mockDOM['advCombN'].value = '5';
+  calculateAdvancedCombinatorics();
+  assert(mockDOM['advCombResult'].innerHTML.includes('52'), 'Bell number B_5 evaluates to 52');
+
+  // 8. Settings State Management
+  updateSetting('precision', 4);
+  assert(settingsState.precision === 4, 'Settings updated decimal precision to 4');
+  const formattedWithSetting = formatResult(1.23456789);
+  assert(formattedWithSetting === '1.235', 'formatResult respects user precision setting (4 sig digits)');
+  resetCalculatorSettings();
+  assert(settingsState.precision === 12, 'resetCalculatorSettings restores default precision of 12');
+
+  console.log('\n--- Step 9: Comprehensive Multi-Device Responsiveness ---');
+  
+  // 1. Viewport & Mobile Meta Tags
+  assert(htmlContent.includes('viewport-fit=cover'), 'HTML meta viewport includes viewport-fit=cover for notch/gesture devices');
+  assert(htmlContent.includes('id="menuBackdrop"'), 'HTML contains #menuBackdrop for touch-outside dismiss on mobile');
+
+  // 2. CSS Media Query Verification
+  const cssContent = fs.readFileSync(path.join(__dirname, '../calculate.css'), 'utf8');
+  assert(cssContent.includes('@media (max-width: 992px)'), 'CSS includes tablet/medium laptop breakpoint (992px)');
+  assert(cssContent.includes('@media (max-width: 768px)'), 'CSS includes mobile portrait/tablet breakpoint (768px)');
+  assert(cssContent.includes('@media (max-width: 480px)'), 'CSS includes smartphone standard breakpoint (480px)');
+  assert(cssContent.includes('@media (max-width: 360px)'), 'CSS includes small/compact phone breakpoint (360px)');
+  assert(cssContent.includes('(orientation: landscape)'), 'CSS includes mobile compact landscape orientation rules');
+  assert(cssContent.includes('env(safe-area-inset-top)'), 'CSS incorporates iOS/Android safe area insets');
+  assert(cssContent.includes('overflow-x: auto') && cssContent.includes('-webkit-overflow-scrolling: touch'), 'Horizontal scroll containers enabled for touch devices');
+
+  // 3. Hamburger Menu Drawer Navigation Execution
+  openHamburgerMenu();
+  assert(mockDOM['hamburgerMenu'].classList.contains('open'), 'openHamburgerMenu() adds .open class to mobile drawer');
+  closeHamburgerMenu();
+  assert(!mockDOM['hamburgerMenu'].classList.contains('open'), 'closeHamburgerMenu() removes .open class');
+
+  // 4. Mode Switching auto-closes Mobile Drawer
+  openHamburgerMenu();
+  switchMode('basic');
+  assert(!mockDOM['hamburgerMenu'].classList.contains('open'), 'switchMode() automatically closes mobile drawer upon navigation');
+
+  // 5. Matrix Results Containment & Responsive Equation Layout
+  assert(cssContent.includes('.matrix-equation-view') && cssContent.includes('.matrix-equation-item'), 'CSS includes responsive .matrix-equation-view layout');
+  multiplyMatrices();
+  assert(mockDOM['matrixResult'].innerHTML.includes('matrix-equation-view'), 'multiplyMatrices() outputs responsive .matrix-equation-view wrapper');
+  assert(mockDOM['matrixResult'].innerHTML.includes('matrix-equation-item'), 'multiplyMatrices() wraps each operand in .matrix-equation-item');
+
+  console.log('\n--- Step 10: Glossy Neon Green PWA Install Button Specification ---');
+  // 1. Structure Verification
+  assert(htmlContent.includes('pwa-install-container') && htmlContent.includes('pwaInstallContainer'), 'PWA install container widget present in HTML');
+  assert(htmlContent.includes('pwa-install-pill') && htmlContent.includes('pwaInstallBtn'), 'Glossy pill install button present with #pwaInstallBtn');
+  assert(htmlContent.includes('pill-label') && htmlContent.includes('Install the App'), 'Install button features "Install the App" label');
+  assert(htmlContent.includes('pill-download-box') && htmlContent.includes('pill-divider'), 'Install button contains download tray icon and vertical divider');
+  assert(htmlContent.includes('pill-target-box') && htmlContent.includes('pill-target-svg'), 'Install button contains concentric target bullseye');
+  assert(htmlContent.includes('pill-hand-pointer') && htmlContent.includes('pill-hand-svg') && htmlContent.includes('hand-tap-anim'), 'Install button contains animated cartoon pointer hand tapping the target');
+  assert(htmlContent.includes('install-floor-ring'), 'Install button features bottom curved neon floor glow');
+  assert(htmlContent.includes('install-rays-left') && htmlContent.includes('install-rays-right'), 'Install button features top-left green and top-right yellow action rays');
+
+  // 2. CSS Visual Fidelity & Animations
+  assert(cssContent.includes('.pwa-install-pill') && cssContent.includes('.pill-gloss-shine'), 'CSS includes capsule pill styling with glass specular reflection');
+  assert(cssContent.includes('handTapBounce'), 'CSS includes @keyframes handTapBounce for tactile button tapping animation');
+  assert(cssContent.includes('floorPulse'), 'CSS includes @keyframes floorPulse for neon floor glow');
+  assert(cssContent.includes('@media (max-width: 600px)') && cssContent.includes('.pwa-install-container'), 'CSS includes responsive mobile scaling for the install button');
 
   console.log('\n====================================================');
   console.log(`  SUMMARY: ALL ${totalPassed} TESTS PASSED PERFECTLY! (0 Failed)`);

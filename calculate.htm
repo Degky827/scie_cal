@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Advanced Scientific Calculator</title>
     
     <!-- PWA Meta Tags -->
@@ -17,9 +17,10 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/icon-16.png">
+    <link rel="apple-touch-icon" href="images/icon-192.png">
     
     <!-- Stylesheets -->
     <link rel="stylesheet" href="calculate.css">
@@ -47,10 +48,12 @@
                     <button class="mode-btn" data-mode="combinatorics">Combinatorics</button>
                     <button class="mode-btn" data-mode="matrix">Matrix</button>
                     <button class="mode-btn" data-mode="gpa">GPA</button>
+                    <button class="mode-btn" onclick="openSettings()" title="Settings"><i class="fas fa-cog"></i> Settings</button>
                 </div>
             </div>
 
-            <!-- Hamburger menu panel -->
+            <!-- Hamburger menu panel & Backdrop -->
+            <div id="menuBackdrop" class="menu-backdrop" onclick="closeHamburgerMenu()"></div>
             <nav id="hamburgerMenu" class="hamburger-menu hidden" aria-hidden="true">
                 <div class="hamburger-menu-inner">
                     <button id="closeMenuBtn" class="close-menu" aria-label="Close menu">&times;</button>
@@ -64,7 +67,8 @@
                         <li><button onclick="switchMode('matrix')">Matrix</button></li>
                         <li><button onclick="switchMode('gpa')">GPA</button></li>
                         <li><button onclick="toggleHistory()">History</button></li>
-                        <li><button id="menuInstallBtn">Install App</button></li>
+                        <li><button onclick="openSettings()"><i class="fas fa-cog"></i> Settings</button></li>
+                        <li><button id="menuInstallBtn" onclick="triggerPwaInstall()"><i class="fas fa-hand-pointer install-pointer-icon"></i> Install App</button></li>
                     </ul>
                 </div>
             </nav>
@@ -128,6 +132,12 @@
                 <button class="btn btn-function" onclick="scientificFunction('exp')">e<sup>x</sup></button>
                 <button class="btn btn-function" onclick="scientificFunction('10^')">10<sup>x</sup></button>
 
+                <button class="btn btn-function" onclick="scientificFunction('sinh')">sinh</button>
+                <button class="btn btn-function" onclick="scientificFunction('cosh')">cosh</button>
+                <button class="btn btn-function" onclick="scientificFunction('tanh')">tanh</button>
+                <button class="btn btn-function" onclick="scientificFunction('log2')">log₂</button>
+                <button class="btn btn-function" onclick="scientificFunction('toFraction')" title="Convert between decimal and fraction">a/b</button>
+
                 <button class="btn btn-function" onclick="scientificFunction('sqrt')">√</button>
                 <button class="btn btn-function" onclick="scientificFunction('cbrt')">∛</button>
                 <button class="btn btn-function" onclick="appendOperator('^')">x<sup>y</sup></button>
@@ -149,7 +159,36 @@
 
             <!-- Calculus Mode -->
             <div class="calculus-mode hidden" id="calculusMode">
-                <div class="calculus-section">
+                <div class="sub-nav-container">
+                    <div class="sub-nav-tabs">
+                        <button class="sub-tab-btn active" data-tab="calcDerivative" onclick="switchSubTab('calculusMode', 'calcDerivative')">
+                            <i class="fas fa-chart-line"></i> Derivative (d/dx)
+                        </button>
+                        <button class="sub-tab-btn" data-tab="calcIntegral" onclick="switchSubTab('calculusMode', 'calcIntegral')">
+                            <i class="fas fa-calculator"></i> Integration (∫)
+                        </button>
+                        <button class="sub-tab-btn" data-tab="calcEquation" onclick="switchSubTab('calculusMode', 'calcEquation')">
+                            <i class="fas fa-equals"></i> Equation Solver
+                        </button>
+                        <button class="sub-tab-btn" data-tab="calcLimit" onclick="switchSubTab('calculusMode', 'calcLimit')">
+                            <i class="fas fa-arrows-alt-h"></i> Limits (lim)
+                        </button>
+                        <button class="sub-tab-btn" data-tab="calcTaylor" onclick="switchSubTab('calculusMode', 'calcTaylor')">
+                            <i class="fas fa-superscript"></i> Taylor Series
+                        </button>
+                    </div>
+                    <div class="sub-tab-selector-wrapper">
+                        <select class="sub-tab-selector" onchange="switchSubTab('calculusMode', this.value)">
+                            <option value="calcDerivative">Derivative (d/dx)</option>
+                            <option value="calcIntegral">Integration (∫)</option>
+                            <option value="calcEquation">Equation Solver</option>
+                            <option value="calcLimit">Limits (lim x→c)</option>
+                            <option value="calcTaylor">Taylor & Maclaurin Series</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="calculus-section sub-tab-content" id="calcDerivative">
                     <h3><i class="fas fa-function"></i> Derivative (d/dx)</h3>
                     <div class="calculus-input">
                         <input type="text" id="derivativeInput" placeholder="Enter function (e.g., x^2 + 3*x)">
@@ -161,7 +200,7 @@
                     <div class="calculus-result" id="derivativeResult"></div>
                 </div>
 
-                <div class="calculus-section">
+                <div class="calculus-section sub-tab-content hidden" id="calcIntegral">
                     <h3><i class="fas fa-integral"></i> Integration (∫)</h3>
                     <div class="calculus-input">
                         <input type="text" id="integralInput" placeholder="Enter function (e.g., x^2)">
@@ -176,7 +215,7 @@
                     <div class="calculus-result" id="integralResult"></div>
                 </div>
 
-                <div class="calculus-section">
+                <div class="calculus-section sub-tab-content hidden" id="calcEquation">
                     <h3><i class="fas fa-square-root-alt"></i> Equation Solver</h3>
                     <div class="calculus-input">
                         <input type="text" id="equationInput" placeholder="Enter equation (e.g., x^2 - 4 = 0)">
@@ -186,271 +225,340 @@
                     </div>
                     <div class="calculus-result" id="equationResult"></div>
                 </div>
+
+                <div class="calculus-section sub-tab-content hidden" id="calcLimit">
+                    <h3><i class="fas fa-arrows-alt-h"></i> Limit Calculator (lim x→c)</h3>
+                    <div class="calculus-input">
+                        <input type="text" id="limitInput" placeholder="Enter function (e.g., sin(x)/x, (x^2 - 1)/(x - 1))">
+                        <input type="number" id="limitPoint" placeholder="Approaching c" value="0" step="any">
+                        <select id="limitDirection" style="padding: 8px; border-radius: 6px; background: #1e293b; color: #fff;">
+                            <option value="both">Two-Sided (x → c)</option>
+                            <option value="left">Left-Hand (x → c⁻)</option>
+                            <option value="right">Right-Hand (x → c⁺)</option>
+                        </select>
+                        <button class="btn btn-calculus" onclick="calculateLimit()">
+                            <i class="fas fa-calculator"></i> Calculate Limit
+                        </button>
+                    </div>
+                    <div class="calculus-result" id="limitResult"></div>
+                </div>
+
+                <div class="calculus-section sub-tab-content hidden" id="calcTaylor">
+                    <h3><i class="fas fa-superscript"></i> Taylor & Maclaurin Series</h3>
+                    <div class="calculus-input">
+                        <input type="text" id="taylorInput" placeholder="Enter function (e.g., sin(x), e^x, cos(x))">
+                        <input type="number" id="taylorCenter" placeholder="Center c (0 for Maclaurin)" value="0" step="any">
+                        <input type="number" id="taylorOrder" placeholder="Order n (1-6)" value="4" min="1" max="6">
+                        <button class="btn btn-calculus" onclick="calculateTaylorSeries()">
+                            <i class="fas fa-calculator"></i> Generate Series
+                        </button>
+                    </div>
+                    <div class="calculus-result" id="taylorResult"></div>
+                </div>
             </div>
 
             <!-- Polynomial Mode -->
             <div class="polynomial-mode hidden" id="polynomialMode">
-                <!-- Polynomial Solver Section -->
-                <div class="polynomial-section">
-                    <h3><i class="fas fa-function"></i> Polynomial Function Solver</h3>
-                    <div class="polynomial-description">
-                        <p>Solve polynomial equations, find roots, and analyze polynomial functions</p>
-                        <small>Supports polynomials up to degree 4 with exact and numerical solutions</small>
+                <div class="sub-nav-container">
+                    <div class="sub-nav-tabs">
+                        <button class="sub-tab-btn active" data-tab="polySolver" onclick="switchSubTab('polynomialMode', 'polySolver')">
+                            <i class="fas fa-function"></i> Solver & Roots
+                        </button>
+                        <button class="sub-tab-btn" data-tab="polyAnalysis" onclick="switchSubTab('polynomialMode', 'polyAnalysis')">
+                            <i class="fas fa-chart-area"></i> Function Analysis
+                        </button>
+                        <button class="sub-tab-btn" data-tab="polyGraph" onclick="switchSubTab('polynomialMode', 'polyGraph')">
+                            <i class="fas fa-chart-line"></i> Function Graph
+                        </button>
+                        <button class="sub-tab-btn" data-tab="polyOperations" onclick="switchSubTab('polynomialMode', 'polyOperations')">
+                            <i class="fas fa-calculator"></i> Operations
+                        </button>
+                        <button class="sub-tab-btn" data-tab="polyExamples" onclick="switchSubTab('polynomialMode', 'polyExamples')">
+                            <i class="fas fa-lightbulb"></i> Quick Examples
+                        </button>
                     </div>
-                    
-                    <div class="polynomial-input-container">
-                        <div class="polynomial-input-method">
-                            <label>Input Method:</label>
-                            <select id="polynomialInputMethod" onchange="updatePolynomialInputMethod()">
-                                <option value="coefficients">Coefficients (ax³ + bx² + cx + d = 0)</option>
-                                <option value="expression">Expression (x^3 - 2*x^2 + x - 1 = 0)</option>
-                                <option value="factored">Factored Form ((x-1)(x+2)(x-3) = 0)</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Coefficient Input -->
-                        <div class="coefficient-input" id="coefficientInput">
-                            <div class="polynomial-degree">
-                                <label>Polynomial Degree:</label>
-                                <select id="polynomialDegree" onchange="updateCoefficientInputs()">
-                                    <option value="1">Linear (ax + b = 0)</option>
-                                    <option value="2" selected>Quadratic (ax² + bx + c = 0)</option>
-                                    <option value="3">Cubic (ax³ + bx² + cx + d = 0)</option>
-                                    <option value="4">Quartic (ax⁴ + bx³ + cx² + dx + e = 0)</option>
-                                </select>
-                            </div>
-                            
-                            <div class="coefficients-grid" id="coefficientsGrid">
-                                <!-- Coefficient inputs will be generated here -->
-                            </div>
-                        </div>
-                        
-                        <!-- Expression Input -->
-                        <div class="expression-input hidden" id="expressionInput">
-                            <div class="input-group">
-                                <label>Polynomial Expression:</label>
-                                <input type="text" id="polynomialExpression" placeholder="e.g., x^3 - 2*x^2 + x - 1" />
-                                <small>Use * for multiplication, ^ for powers. Set equal to 0 automatically.</small>
-                            </div>
-                        </div>
-                        
-                        <!-- Factored Input -->
-                        <div class="factored-input hidden" id="factoredInput">
-                            <div class="input-group">
-                                <label>Factored Form:</label>
-                                <input type="text" id="polynomialFactored" placeholder="e.g., (x-1)(x+2)(x-3)" />
-                                <small>Enter factors in the form (x-a)(x-b)... or (ax+b)(cx+d)...</small>
-                            </div>
-                        </div>
-                        
-                        <div class="polynomial-actions">
-                            <button class="btn btn-solve-polynomial" onclick="solvePolynomial()">
-                                <i class="fas fa-calculator"></i> Solve Polynomial
-                            </button>
-                            <button class="btn btn-analyze-polynomial" onclick="analyzePolynomial()">
-                                <i class="fas fa-chart-line"></i> Analyze Function
-                            </button>
-                            <button class="btn btn-clear-polynomial" onclick="clearPolynomial()">
-                                <i class="fas fa-eraser"></i> Clear
-                            </button>
-                        </div>
+                    <div class="sub-tab-selector-wrapper">
+                        <select class="sub-tab-selector" onchange="switchSubTab('polynomialMode', this.value)">
+                            <option value="polySolver">Polynomial Function Solver & Roots</option>
+                            <option value="polyAnalysis">Function Analysis</option>
+                            <option value="polyGraph">Function Graph</option>
+                            <option value="polyOperations">Polynomial Operations</option>
+                            <option value="polyExamples">Quick Examples</option>
+                        </select>
                     </div>
                 </div>
 
-                <!-- Polynomial Results Section -->
-                <div class="polynomial-section">
-                    <h3><i class="fas fa-square-root-alt"></i> Solutions & Roots</h3>
-                    <div class="polynomial-result" id="polynomialResult">
-                        <p class="no-result">Polynomial solutions will appear here...</p>
+                <!-- Polynomial Solver Section -->
+                <div class="sub-tab-content" id="polySolver">
+                    <div class="polynomial-section">
+                        <h3><i class="fas fa-function"></i> Polynomial Function Solver</h3>
+                        <div class="polynomial-description">
+                            <p>Solve polynomial equations, find roots, and analyze polynomial functions</p>
+                            <small>Supports polynomials up to degree 4 with exact and numerical solutions</small>
+                        </div>
+                        
+                        <div class="polynomial-input-container">
+                            <div class="polynomial-input-method">
+                                <label>Input Method:</label>
+                                <select id="polynomialInputMethod" onchange="updatePolynomialInputMethod()">
+                                    <option value="coefficients">Coefficients (ax³ + bx² + cx + d = 0)</option>
+                                    <option value="expression">Expression (x^3 - 2*x^2 + x - 1 = 0)</option>
+                                    <option value="factored">Factored Form ((x-1)(x+2)(x-3) = 0)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Coefficient Input -->
+                            <div class="coefficient-input" id="coefficientInput">
+                                <div class="polynomial-degree">
+                                    <label>Polynomial Degree:</label>
+                                    <select id="polynomialDegree" onchange="updateCoefficientInputs()">
+                                        <option value="1">Linear (ax + b = 0)</option>
+                                        <option value="2" selected>Quadratic (ax² + bx + c = 0)</option>
+                                        <option value="3">Cubic (ax³ + bx² + cx + d = 0)</option>
+                                        <option value="4">Quartic (ax⁴ + bx³ + cx² + dx + e = 0)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="coefficients-grid" id="coefficientsGrid">
+                                    <!-- Coefficient inputs will be generated here -->
+                                </div>
+                            </div>
+                            
+                            <!-- Expression Input -->
+                            <div class="expression-input hidden" id="expressionInput">
+                                <div class="input-group">
+                                    <label>Polynomial Expression:</label>
+                                    <input type="text" id="polynomialExpression" placeholder="e.g., x^3 - 2*x^2 + x - 1" />
+                                    <small>Use * for multiplication, ^ for powers. Set equal to 0 automatically.</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Factored Input -->
+                            <div class="factored-input hidden" id="factoredInput">
+                                <div class="input-group">
+                                    <label>Factored Form:</label>
+                                    <input type="text" id="polynomialFactored" placeholder="e.g., (x-1)(x+2)(x-3)" />
+                                    <small>Enter factors in the form (x-a)(x-b)... or (ax+b)(cx+d)...</small>
+                                </div>
+                            </div>
+                            
+                            <div class="polynomial-actions">
+                                <button class="btn btn-solve-polynomial" onclick="solvePolynomial()">
+                                    <i class="fas fa-calculator"></i> Solve Polynomial
+                                </button>
+                                <button class="btn btn-analyze-polynomial" onclick="analyzePolynomial()">
+                                    <i class="fas fa-chart-line"></i> Analyze Function
+                                </button>
+                                <button class="btn btn-clear-polynomial" onclick="clearPolynomial()">
+                                    <i class="fas fa-eraser"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Polynomial Results Section -->
+                    <div class="polynomial-section">
+                        <h3><i class="fas fa-square-root-alt"></i> Solutions & Roots</h3>
+                        <div class="polynomial-result" id="polynomialResult">
+                            <p class="no-result">Polynomial solutions will appear here...</p>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Polynomial Analysis Section -->
-                <div class="polynomial-section">
-                    <h3><i class="fas fa-chart-area"></i> Function Analysis</h3>
-                    <div class="polynomial-analysis" id="polynomialAnalysis">
-                        <p class="no-result">Function analysis will appear here...</p>
+                <div class="sub-tab-content hidden" id="polyAnalysis">
+                    <div class="polynomial-section">
+                        <h3><i class="fas fa-chart-area"></i> Function Analysis</h3>
+                        <div class="polynomial-analysis" id="polynomialAnalysis">
+                            <p class="no-result">Function analysis will appear here...</p>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Polynomial Graph Section -->
-                <div class="polynomial-section">
-                    <h3><i class="fas fa-chart-line"></i> Function Graph</h3>
-                    <div class="graph-controls">
-                        <div class="graph-settings">
-                            <div class="range-controls">
-                                <div class="range-input">
-                                    <label>X Range:</label>
-                                    <input type="number" id="xMin" placeholder="-10" value="-10" step="0.5">
-                                    <span>to</span>
-                                    <input type="number" id="xMax" placeholder="10" value="10" step="0.5">
+                <div class="sub-tab-content hidden" id="polyGraph">
+                    <div class="polynomial-section">
+                        <h3><i class="fas fa-chart-line"></i> Function Graph</h3>
+                        <div class="graph-controls">
+                            <div class="graph-settings">
+                                <div class="range-controls">
+                                    <div class="range-input">
+                                        <label>X Range:</label>
+                                        <input type="number" id="xMin" placeholder="-10" value="-10" step="0.5">
+                                        <span>to</span>
+                                        <input type="number" id="xMax" placeholder="10" value="10" step="0.5">
+                                    </div>
+                                    <div class="range-input">
+                                        <label>Y Range:</label>
+                                        <input type="number" id="yMin" placeholder="-10" value="-10" step="0.5">
+                                        <span>to</span>
+                                        <input type="number" id="yMax" placeholder="10" value="10" step="0.5">
+                                    </div>
                                 </div>
-                                <div class="range-input">
-                                    <label>Y Range:</label>
-                                    <input type="number" id="yMin" placeholder="-10" value="-10" step="0.5">
-                                    <span>to</span>
-                                    <input type="number" id="yMax" placeholder="10" value="10" step="0.5">
+                                <div class="graph-options">
+                                    <label>
+                                        <input type="checkbox" id="showGrid" checked> Show Grid
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="showRoots" checked> Highlight Roots
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="showCriticalPoints" checked> Show Critical Points
+                                    </label>
                                 </div>
                             </div>
-                            <div class="graph-options">
-                                <label>
-                                    <input type="checkbox" id="showGrid" checked> Show Grid
-                                </label>
-                                <label>
-                                    <input type="checkbox" id="showRoots" checked> Highlight Roots
-                                </label>
-                                <label>
-                                    <input type="checkbox" id="showCriticalPoints" checked> Show Critical Points
-                                </label>
+                            <div class="graph-actions">
+                                <button class="btn btn-plot-graph" onclick="plotPolynomialGraph()">
+                                    <i class="fas fa-chart-line"></i> Plot Graph
+                                </button>
+                                <button class="btn btn-auto-scale" onclick="autoScaleGraph()">
+                                    <i class="fas fa-expand-arrows-alt"></i> Auto Scale
+                                </button>
+                                <button class="btn btn-reset-view" onclick="resetGraphView()">
+                                    <i class="fas fa-undo"></i> Reset View
+                                </button>
                             </div>
                         </div>
-                        <div class="graph-actions">
-                            <button class="btn btn-plot-graph" onclick="plotPolynomialGraph()">
-                                <i class="fas fa-chart-line"></i> Plot Graph
-                            </button>
-                            <button class="btn btn-auto-scale" onclick="autoScaleGraph()">
-                                <i class="fas fa-expand-arrows-alt"></i> Auto Scale
-                            </button>
-                            <button class="btn btn-reset-view" onclick="resetGraphView()">
-                                <i class="fas fa-undo"></i> Reset View
-                            </button>
-                        </div>
-                    </div>
-                    <div class="graph-container">
-                        <canvas id="polynomialCanvas" width="800" height="600"></canvas>
-                        <div class="graph-hints">
-                            Hover over the graph to see coordinates • Red circles show roots • Yellow diamonds show critical points
-                        </div>
-                        <div class="graph-info" id="graphInfo">
-                            <p class="no-result">Graph will appear here when you plot a polynomial...</p>
+                        <div class="graph-container">
+                            <canvas id="polynomialCanvas" width="800" height="600"></canvas>
+                            <div class="graph-hints">
+                                Hover over the graph to see coordinates • Red circles show roots • Yellow diamonds show critical points
+                            </div>
+                            <div class="graph-info" id="graphInfo">
+                                <p class="no-result">Graph will appear here when you plot a polynomial...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Polynomial Operations Section -->
-                <div class="polynomial-section">
-                    <h3><i class="fas fa-calculator"></i> Polynomial Operations</h3>
-                    <div class="polynomial-operations">
-                        <div class="operation-tabs">
-                            <button class="btn btn-tab active" onclick="setPolynomialOperation('arithmetic')">Arithmetic</button>
-                            <button class="btn btn-tab" onclick="setPolynomialOperation('division')">Division</button>
-                            <button class="btn btn-tab" onclick="setPolynomialOperation('composition')">Composition</button>
-                            <button class="btn btn-tab" onclick="setPolynomialOperation('derivative')">Derivative</button>
-                        </div>
-                        
-                        <!-- Arithmetic Operations -->
-                        <div class="operation-content" id="arithmeticOperation">
-                            <div class="polynomial-inputs">
-                                <div class="input-group">
-                                    <label>Polynomial P(x):</label>
-                                    <input type="text" id="polyA" placeholder="e.g., x^2 + 2*x + 1" />
+                <div class="sub-tab-content hidden" id="polyOperations">
+                    <div class="polynomial-section">
+                        <h3><i class="fas fa-calculator"></i> Polynomial Operations</h3>
+                        <div class="polynomial-operations">
+                            <div class="operation-tabs">
+                                <button class="btn btn-tab active" onclick="setPolynomialOperation('arithmetic')">Arithmetic</button>
+                                <button class="btn btn-tab" onclick="setPolynomialOperation('division')">Division</button>
+                                <button class="btn btn-tab" onclick="setPolynomialOperation('composition')">Composition</button>
+                                <button class="btn btn-tab" onclick="setPolynomialOperation('derivative')">Derivative</button>
+                            </div>
+                            
+                            <!-- Arithmetic Operations -->
+                            <div class="operation-content" id="arithmeticOperation">
+                                <div class="polynomial-inputs">
+                                    <div class="input-group">
+                                        <label>Polynomial P(x):</label>
+                                        <input type="text" id="polyA" placeholder="e.g., x^2 + 2*x + 1" />
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Polynomial Q(x):</label>
+                                        <input type="text" id="polyB" placeholder="e.g., x - 1" />
+                                    </div>
+                                    <div class="operation-buttons">
+                                        <button class="btn btn-poly-op" onclick="polynomialArithmetic('add')">P + Q</button>
+                                        <button class="btn btn-poly-op" onclick="polynomialArithmetic('subtract')">P - Q</button>
+                                        <button class="btn btn-poly-op" onclick="polynomialArithmetic('multiply')">P × Q</button>
+                                    </div>
                                 </div>
-                                <div class="input-group">
-                                    <label>Polynomial Q(x):</label>
-                                    <input type="text" id="polyB" placeholder="e.g., x - 1" />
+                            </div>
+                            
+                            <!-- Division Operations -->
+                            <div class="operation-content hidden" id="divisionOperation">
+                                <div class="polynomial-inputs">
+                                    <div class="input-group">
+                                        <label>Dividend P(x):</label>
+                                        <input type="text" id="polyDividend" placeholder="e.g., x^3 + 2*x^2 - x + 1" />
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Divisor Q(x):</label>
+                                        <input type="text" id="polyDivisor" placeholder="e.g., x - 2" />
+                                    </div>
+                                    <div class="operation-buttons">
+                                        <button class="btn btn-poly-op" onclick="polynomialDivision()">
+                                            <i class="fas fa-divide"></i> Long Division
+                                        </button>
+                                        <button class="btn btn-poly-op" onclick="syntheticDivision()">
+                                            <i class="fas fa-calculator"></i> Synthetic Division
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="operation-buttons">
-                                    <button class="btn btn-poly-op" onclick="polynomialArithmetic('add')">P + Q</button>
-                                    <button class="btn btn-poly-op" onclick="polynomialArithmetic('subtract')">P - Q</button>
-                                    <button class="btn btn-poly-op" onclick="polynomialArithmetic('multiply')">P × Q</button>
+                            </div>
+                            
+                            <!-- Composition Operations -->
+                            <div class="operation-content hidden" id="compositionOperation">
+                                <div class="polynomial-inputs">
+                                    <div class="input-group">
+                                        <label>Outer Function f(x):</label>
+                                        <input type="text" id="polyOuter" placeholder="e.g., x^2 + 1" />
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Inner Function g(x):</label>
+                                        <input type="text" id="polyInner" placeholder="e.g., 2*x - 1" />
+                                    </div>
+                                    <div class="operation-buttons">
+                                        <button class="btn btn-poly-op" onclick="polynomialComposition()">
+                                            <i class="fas fa-link"></i> f(g(x))
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Derivative Operations -->
+                            <div class="operation-content hidden" id="derivativeOperation">
+                                <div class="polynomial-inputs">
+                                    <div class="input-group">
+                                        <label>Polynomial f(x):</label>
+                                        <input type="text" id="polyDerivative" placeholder="e.g., x^4 - 3*x^2 + 2*x" />
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Derivative Order:</label>
+                                        <select id="derivativeOrder">
+                                            <option value="1" selected>First Derivative f'(x)</option>
+                                            <option value="2">Second Derivative f''(x)</option>
+                                            <option value="3">Third Derivative f'''(x)</option>
+                                            <option value="4">Fourth Derivative f⁽⁴⁾(x)</option>
+                                        </select>
+                                    </div>
+                                    <div class="operation-buttons">
+                                        <button class="btn btn-poly-op" onclick="polynomialDerivative()">
+                                            <i class="fas fa-chart-line"></i> Calculate Derivative
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Division Operations -->
-                        <div class="operation-content hidden" id="divisionOperation">
-                            <div class="polynomial-inputs">
-                                <div class="input-group">
-                                    <label>Dividend P(x):</label>
-                                    <input type="text" id="polyDividend" placeholder="e.g., x^3 + 2*x^2 - x + 1" />
-                                </div>
-                                <div class="input-group">
-                                    <label>Divisor Q(x):</label>
-                                    <input type="text" id="polyDivisor" placeholder="e.g., x - 2" />
-                                </div>
-                                <div class="operation-buttons">
-                                    <button class="btn btn-poly-op" onclick="polynomialDivision()">
-                                        <i class="fas fa-divide"></i> Long Division
-                                    </button>
-                                    <button class="btn btn-poly-op" onclick="syntheticDivision()">
-                                        <i class="fas fa-calculator"></i> Synthetic Division
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="polynomial-operation-result" id="polynomialOperationResult">
+                            <p class="no-result">Operation results will appear here...</p>
                         </div>
-                        
-                        <!-- Composition Operations -->
-                        <div class="operation-content hidden" id="compositionOperation">
-                            <div class="polynomial-inputs">
-                                <div class="input-group">
-                                    <label>Outer Function f(x):</label>
-                                    <input type="text" id="polyOuter" placeholder="e.g., x^2 + 1" />
-                                </div>
-                                <div class="input-group">
-                                    <label>Inner Function g(x):</label>
-                                    <input type="text" id="polyInner" placeholder="e.g., 2*x - 1" />
-                                </div>
-                                <div class="operation-buttons">
-                                    <button class="btn btn-poly-op" onclick="polynomialComposition()">
-                                        <i class="fas fa-link"></i> f(g(x))
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Derivative Operations -->
-                        <div class="operation-content hidden" id="derivativeOperation">
-                            <div class="polynomial-inputs">
-                                <div class="input-group">
-                                    <label>Polynomial f(x):</label>
-                                    <input type="text" id="polyDerivative" placeholder="e.g., x^4 - 3*x^2 + 2*x" />
-                                </div>
-                                <div class="input-group">
-                                    <label>Derivative Order:</label>
-                                    <select id="derivativeOrder">
-                                        <option value="1" selected>First Derivative f'(x)</option>
-                                        <option value="2">Second Derivative f''(x)</option>
-                                        <option value="3">Third Derivative f'''(x)</option>
-                                        <option value="4">Fourth Derivative f⁽⁴⁾(x)</option>
-                                    </select>
-                                </div>
-                                <div class="operation-buttons">
-                                    <button class="btn btn-poly-op" onclick="polynomialDerivative()">
-                                        <i class="fas fa-chart-line"></i> Calculate Derivative
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="polynomial-operation-result" id="polynomialOperationResult">
-                        <p class="no-result">Operation results will appear here...</p>
                     </div>
                 </div>
 
                 <!-- Polynomial Examples Section -->
-                <div class="polynomial-section">
-                    <h3><i class="fas fa-lightbulb"></i> Quick Examples</h3>
-                    <div class="polynomial-examples">
-                        <div class="example-card" onclick="loadPolynomialExample('quadratic')">
-                            <h4>Quadratic</h4>
-                            <p>x² - 5x + 6 = 0</p>
-                            <small>Two real roots</small>
-                        </div>
-                        <div class="example-card" onclick="loadPolynomialExample('cubic')">
-                            <h4>Cubic</h4>
-                            <p>x³ - 6x² + 11x - 6 = 0</p>
-                            <small>Three real roots</small>
-                        </div>
-                        <div class="example-card" onclick="loadPolynomialExample('quartic')">
-                            <h4>Quartic</h4>
-                            <p>x⁴ - 10x² + 9 = 0</p>
-                            <small>Four real roots</small>
-                        </div>
-                        <div class="example-card" onclick="loadPolynomialExample('complex')">
-                            <h4>Complex Roots</h4>
-                            <p>x² + x + 1 = 0</p>
-                            <small>Complex conjugate roots</small>
+                <div class="sub-tab-content hidden" id="polyExamples">
+                    <div class="polynomial-section">
+                        <h3><i class="fas fa-lightbulb"></i> Quick Examples</h3>
+                        <div class="polynomial-examples">
+                            <div class="example-card" onclick="loadPolynomialExample('quadratic')">
+                                <h4>Quadratic</h4>
+                                <p>x² - 5x + 6 = 0</p>
+                                <small>Two real roots</small>
+                            </div>
+                            <div class="example-card" onclick="loadPolynomialExample('cubic')">
+                                <h4>Cubic</h4>
+                                <p>x³ - 6x² + 11x - 6 = 0</p>
+                                <small>Three real roots</small>
+                            </div>
+                            <div class="example-card" onclick="loadPolynomialExample('quartic')">
+                                <h4>Quartic</h4>
+                                <p>x⁴ - 10x² + 9 = 0</p>
+                                <small>Four real roots</small>
+                            </div>
+                            <div class="example-card" onclick="loadPolynomialExample('complex')">
+                                <h4>Complex Roots</h4>
+                                <p>x² + x + 1 = 0</p>
+                                <small>Complex conjugate roots</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -719,7 +827,44 @@
 
             <!-- Combinatorics Mode -->
             <div class="combinatorics-mode hidden" id="combinatoricsMode">
-                <div class="combinatorics-section">
+                <div class="sub-nav-container">
+                    <div class="sub-nav-tabs">
+                        <button class="sub-tab-btn active" data-tab="combPermutations" onclick="switchSubTab('combinatoricsMode', 'combPermutations')">
+                            <i class="fas fa-sort-numeric-up"></i> Permutations
+                        </button>
+                        <button class="sub-tab-btn" data-tab="combCombinations" onclick="switchSubTab('combinatoricsMode', 'combCombinations')">
+                            <i class="fas fa-layer-group"></i> Combinations
+                        </button>
+                        <button class="sub-tab-btn" data-tab="combBinomial" onclick="switchSubTab('combinatoricsMode', 'combBinomial')">
+                            <i class="fas fa-expand-arrows-alt"></i> Binomial Theorem
+                        </button>
+                        <button class="sub-tab-btn" data-tab="combCoefficient" onclick="switchSubTab('combinatoricsMode', 'combCoefficient')">
+                            <i class="fas fa-search"></i> Coefficient Finder
+                        </button>
+                        <button class="sub-tab-btn" data-tab="combMultinomial" onclick="switchSubTab('combinatoricsMode', 'combMultinomial')">
+                            <i class="fas fa-cubes"></i> Multinomial
+                        </button>
+                        <button class="sub-tab-btn" data-tab="combExamples" onclick="switchSubTab('combinatoricsMode', 'combExamples')">
+                            <i class="fas fa-lightbulb"></i> Examples & Patterns
+                        </button>
+                        <button class="sub-tab-btn" data-tab="combAdvanced" onclick="switchSubTab('combinatoricsMode', 'combAdvanced')">
+                            <i class="fas fa-shapes"></i> Advanced Sequences
+                        </button>
+                    </div>
+                    <div class="sub-tab-selector-wrapper">
+                        <select class="sub-tab-selector" onchange="switchSubTab('combinatoricsMode', this.value)">
+                            <option value="combPermutations">Permutations P(n,r)</option>
+                            <option value="combCombinations">Combinations C(n,r)</option>
+                            <option value="combBinomial">Binomial Theorem</option>
+                            <option value="combCoefficient">Coefficient Finder</option>
+                            <option value="combMultinomial">Multinomial Theorem</option>
+                            <option value="combExamples">Examples & Patterns</option>
+                            <option value="combAdvanced">Advanced Sequences & Partitions</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="combinatorics-section sub-tab-content" id="combPermutations">
                     <h3><i class="fas fa-sort-numeric-up"></i> Permutations (P)</h3>
                     <div class="combinatorics-input">
                         <div class="input-group">
@@ -737,7 +882,7 @@
                     <div class="combinatorics-result" id="permutationResult"></div>
                 </div>
 
-                <div class="combinatorics-section">
+                <div class="combinatorics-section sub-tab-content hidden" id="combCombinations">
                     <h3><i class="fas fa-layer-group"></i> Combinations (C)</h3>
                     <div class="combinatorics-input">
                         <div class="input-group">
@@ -755,7 +900,7 @@
                     <div class="combinatorics-result" id="combinationResult"></div>
                 </div>
 
-                <div class="combinatorics-section">
+                <div class="combinatorics-section sub-tab-content hidden" id="combBinomial">
                     <h3><i class="fas fa-expand-arrows-alt"></i> Binomial Theorem</h3>
                     <div class="combinatorics-input">
                         <div class="input-group">
@@ -792,7 +937,7 @@
                     <div class="combinatorics-result" id="binomialResult"></div>
                 </div>
 
-                <div class="combinatorics-section">
+                <div class="combinatorics-section sub-tab-content hidden" id="combCoefficient">
                     <h3><i class="fas fa-search"></i> Binomial Coefficient Finder</h3>
                     <div class="combinatorics-input">
                         <div class="coefficient-tabs">
@@ -857,7 +1002,7 @@
                     <div class="combinatorics-result" id="coefficientResult"></div>
                 </div>
 
-                <div class="combinatorics-section">
+                <div class="combinatorics-section sub-tab-content hidden" id="combExamples">
                     <h3><i class="fas fa-lightbulb"></i> Binomial Examples & Patterns</h3>
                     <div class="examples-grid">
                         <div class="example-card" onclick="loadBinomialExample('x', '-4/x', 6)">
@@ -892,7 +1037,7 @@
                     </div>
                 </div>
 
-                <div class="combinatorics-section">
+                <div class="combinatorics-section sub-tab-content hidden" id="combMultinomial">
                     <h3><i class="fas fa-cubes"></i> Multinomial Theorem</h3>
                     <div class="combinatorics-input">
                         <div class="input-group">
@@ -936,224 +1081,177 @@
                     </div>
                     <div class="combinatorics-result" id="multinomialResult"></div>
                 </div>
+
+                <div class="combinatorics-section sub-tab-content hidden" id="combAdvanced">
+                    <h3><i class="fas fa-shapes"></i> Advanced Combinatorics & Sequences</h3>
+                    <div class="combinatorics-input">
+                        <div class="input-group">
+                            <label>Calculation Type:</label>
+                            <select id="advCombType" onchange="updateAdvCombInputs()" style="padding: 8px; border-radius: 6px; background: #1e293b; color: #fff;">
+                                <option value="catalan" selected>Catalan Number Cₙ = (1/(n+1))·C(2n, n)</option>
+                                <option value="derangements">Subfactorial / Derangements !n (no fixed points)</option>
+                                <option value="repetition">Combinations with Repetition CR(n, r) = C(n+r-1, r)</option>
+                                <option value="bell">Bell Number Bₙ (number of partitions of a set)</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="advCombNGroup">
+                            <label>n (index / items):</label>
+                            <input type="number" id="advCombN" placeholder="e.g., 5" value="5" min="0" max="30">
+                        </div>
+                        <div class="input-group" id="advCombRGroup" style="display: none;">
+                            <label>r (items to choose with replacement):</label>
+                            <input type="number" id="advCombR" placeholder="e.g., 3" value="3" min="0">
+                        </div>
+                        <button class="btn btn-combinatorics" onclick="calculateAdvancedCombinatorics()">
+                            <i class="fas fa-calculator"></i> Calculate
+                        </button>
+                    </div>
+                    <div class="combinatorics-result" id="advCombResult"></div>
+                </div>
             </div>
 
             <!-- Matrix Mode -->
             <div class="matrix-mode hidden" id="matrixMode">
-                <!-- Matrix Input Section -->
-                <div class="matrix-section">
-                    <h3><i class="fas fa-th"></i> Matrix Input</h3>
-                    <div class="matrix-input-controls">
-                        <div class="matrix-size-controls">
-                            <div class="size-input">
-                                <label>Matrix A Size:</label>
-                                <select id="matrixARows" onchange="updateMatrixInputs('A')">
-                                    <option value="2">2×2</option>
-                                    <option value="3" selected>3×3</option>
-                                    <option value="4">4×4</option>
-                                </select>
-                            </div>
-                            <div class="size-input">
-                                <label>Matrix B Size:</label>
-                                <select id="matrixBRows" onchange="updateMatrixInputs('B')">
-                                    <option value="2">2×2</option>
-                                    <option value="3" selected>3×3</option>
-                                    <option value="4">4×4</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="matrix-inputs-container">
-                            <div class="matrix-input-group">
-                                <h4>Matrix A</h4>
-                                <div class="matrix-grid" id="matrixAGrid"></div>
-                                <div class="matrix-actions">
-                                    <button class="btn btn-matrix-action" onclick="fillRandomMatrix('A')">Random</button>
-                                    <button class="btn btn-matrix-action" onclick="fillIdentityMatrix('A')">Identity</button>
-                                    <button class="btn btn-matrix-action" onclick="clearMatrix('A')">Clear</button>
-                                </div>
-                            </div>
-                            
-                            <div class="matrix-input-group">
-                                <h4>Matrix B</h4>
-                                <div class="matrix-grid" id="matrixBGrid"></div>
-                                <div class="matrix-actions">
-                                    <button class="btn btn-matrix-action" onclick="fillRandomMatrix('B')">Random</button>
-                                    <button class="btn btn-matrix-action" onclick="fillIdentityMatrix('B')">Identity</button>
-                                    <button class="btn btn-matrix-action" onclick="clearMatrix('B')">Clear</button>
-                                </div>
-                            </div>
-                        </div>
+                <div class="sub-nav-container">
+                    <div class="sub-nav-tabs">
+                        <button class="sub-tab-btn active" data-tab="matrixStandard" onclick="switchSubTab('matrixMode', 'matrixStandard')">
+                            <i class="fas fa-th"></i> Standard Operations
+                        </button>
+                        <button class="sub-tab-btn" data-tab="matrixLarge" onclick="switchSubTab('matrixMode', 'matrixLarge'); renderLargeMatrixViewer();">
+                            <i class="fas fa-th-large"></i> Arbitrary & Large (Up to 100×100)
+                        </button>
+                        <button class="sub-tab-btn" data-tab="matrixLinear" onclick="switchSubTab('matrixMode', 'matrixLinear')">
+                            <i class="fas fa-equals"></i> Linear Equations
+                        </button>
+                        <button class="sub-tab-btn" data-tab="matrixDet" onclick="switchSubTab('matrixMode', 'matrixDet')">
+                            <i class="fas fa-square-root-alt"></i> Determinant Rules
+                        </button>
+                        <button class="sub-tab-btn" data-tab="matrixExamples" onclick="switchSubTab('matrixMode', 'matrixExamples')">
+                            <i class="fas fa-lightbulb"></i> Quick Examples
+                        </button>
+                    </div>
+                    <div class="sub-tab-selector-wrapper">
+                        <select class="sub-tab-selector" onchange="switchSubTab('matrixMode', this.value); if(this.value === 'matrixLarge') renderLargeMatrixViewer();">
+                            <option value="matrixStandard">Standard Operations (2×2, 3×3, 4×4)</option>
+                            <option value="matrixLarge">Arbitrary & Large Matrices (Up to 100×100)</option>
+                            <option value="matrixLinear">Linear Equations Solver (Ax = b)</option>
+                            <option value="matrixDet">Determinant Rule Equations</option>
+                            <option value="matrixExamples">Quick Examples</option>
+                        </select>
                     </div>
                 </div>
 
-                <!-- Matrix Operations Section -->
-                <div class="matrix-section">
-                    <h3><i class="fas fa-calculator"></i> Matrix Operations</h3>
-                    <div class="matrix-operations">
-                        <div class="operation-group">
-                            <h4>Single Matrix Operations (Matrix A)</h4>
-                            <div class="operation-buttons">
-                                <button class="btn btn-matrix-op" onclick="calculateDeterminant('A')">
-                                    <i class="fas fa-square-root-alt"></i> Determinant
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateInverse('A')">
-                                    <i class="fas fa-exchange-alt"></i> Inverse
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateTranspose('A')">
-                                    <i class="fas fa-arrows-alt"></i> Transpose
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateTrace('A')">
-                                    <i class="fas fa-diagonal"></i> Trace
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateRank('A')">
-                                    <i class="fas fa-layer-group"></i> Rank
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateEigenvalues('A')">
-                                    <i class="fas fa-wave-square"></i> Eigenvalues
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateEigenvectors('A')">
-                                    <i class="fas fa-arrows-alt"></i> Eigenvectors
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="calculateEigenSystem('A')">
-                                    <i class="fas fa-project-diagram"></i> Eigen System
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="operation-group">
-                            <h4>Two Matrix Operations (A and B)</h4>
-                            <div class="operation-buttons">
-                                <button class="btn btn-matrix-op" onclick="addMatrices()">
-                                    <i class="fas fa-plus"></i> A + B
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="subtractMatrices()">
-                                    <i class="fas fa-minus"></i> A - B
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="multiplyMatrices()">
-                                    <i class="fas fa-times"></i> A × B
-                                </button>
-                                <button class="btn btn-matrix-op" onclick="scalarMultiply()">
-                                    <i class="fas fa-expand-arrows-alt"></i> Scalar × A
-                                </button>
-                            </div>
-                            <div class="scalar-input">
-                                <label>Scalar value:</label>
-                                <input type="number" id="scalarValue" placeholder="Enter scalar" value="2" step="0.1">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Linear Equations Section -->
-                <div class="matrix-section">
-                    <h3><i class="fas fa-equals"></i> Linear Equations Solver</h3>
-                    <div class="linear-equations">
-                        <div class="equation-method-selector">
-                            <label>Solution Method:</label>
-                            <select id="solutionMethod">
-                                <option value="cramer">Cramer's Rule</option>
-                                <option value="gaussian">Gaussian Elimination</option>
-                                <option value="matrix">Matrix Method (A⁻¹B)</option>
-                                <option value="lu">LU Decomposition</option>
-                            </select>
-                        </div>
-                        
-                        <div class="equation-input">
-                            <div class="equation-description">
-                                <p>Solve system: Ax = b</p>
-                                <small>Enter coefficient matrix A and constants vector b</small>
-                            </div>
-                            
-                            <div class="equation-matrices">
-                                <div class="coefficient-matrix">
-                                    <h4>Coefficient Matrix (A)</h4>
-                                    <div class="matrix-size-control">
-                                        <label>System size:</label>
-                                        <select id="systemSize" onchange="updateSystemInputs()">
-                                            <option value="2">2×2 system</option>
-                                            <option value="3" selected>3×3 system</option>
-                                            <option value="4">4×4 system</option>
-                                        </select>
+                <!-- Standard Operations Tab -->
+                <div class="sub-tab-content" id="matrixStandard">
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-th"></i> Matrix Input</h3>
+                        <div class="matrix-input-controls">
+                            <div class="matrix-size-controls">
+                                <div class="size-input-card">
+                                    <label>Matrix A Dimensions (Rows × Cols):</label>
+                                    <div class="matrix-dimension-stepper">
+                                        <input type="number" id="matrixARows" value="3" min="1" max="25" onchange="updateMatrixInputs('A')" class="dim-num-input" title="Matrix A Rows">
+                                        <span>×</span>
+                                        <input type="number" id="matrixACols" value="3" min="1" max="25" onchange="updateMatrixInputs('A')" class="dim-num-input" title="Matrix A Columns">
+                                        <span class="dim-badge" id="badgeMatrixA">3×3</span>
                                     </div>
-                                    <div class="matrix-grid" id="coefficientGrid"></div>
+                                </div>
+                                <div class="size-input-card">
+                                    <label>Matrix B Dimensions (Rows × Cols):</label>
+                                    <div class="matrix-dimension-stepper">
+                                        <input type="number" id="matrixBRows" value="3" min="1" max="25" onchange="updateMatrixInputs('B')" class="dim-num-input" title="Matrix B Rows">
+                                        <span>×</span>
+                                        <input type="number" id="matrixBCols" value="3" min="1" max="25" onchange="updateMatrixInputs('B')" class="dim-num-input" title="Matrix B Columns">
+                                        <span class="dim-badge" id="badgeMatrixB">3×3</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="matrix-inputs-container">
+                                <div class="matrix-input-group">
+                                    <h4>Matrix A</h4>
+                                    <div class="matrix-grid" id="matrixAGrid"></div>
+                                    <div class="matrix-actions">
+                                        <button class="btn btn-matrix-action" onclick="fillRandomMatrix('A')">Random</button>
+                                        <button class="btn btn-matrix-action" onclick="fillIdentityMatrix('A')">Identity</button>
+                                        <button class="btn btn-matrix-action" onclick="clearMatrix('A')">Clear</button>
+                                    </div>
                                 </div>
                                 
-                                <div class="constants-vector">
-                                    <h4>Constants Vector (b)</h4>
-                                    <div class="vector-grid" id="constantsGrid"></div>
+                                <div class="matrix-input-group">
+                                    <h4>Matrix B</h4>
+                                    <div class="matrix-grid" id="matrixBGrid"></div>
+                                    <div class="matrix-actions">
+                                        <button class="btn btn-matrix-action" onclick="fillRandomMatrix('B')">Random</button>
+                                        <button class="btn btn-matrix-action" onclick="fillIdentityMatrix('B')">Identity</button>
+                                        <button class="btn btn-matrix-action" onclick="clearMatrix('B')">Clear</button>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <button class="btn btn-solve-system" onclick="solveLinearSystem()">
-                                <i class="fas fa-calculator"></i> Solve System
-                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- Determinant Rule Equations Section -->
-                <div class="matrix-section">
-                    <h3><i class="fas fa-square-root-alt"></i> Determinant Rule Equations</h3>
-                    <div class="determinant-equations">
-                        <div class="det-equation-selector">
-                            <label>Equation Type:</label>
-                            <select id="detEquationType">
-                                <option value="characteristic">Characteristic Equation det(A - λI) = 0</option>
-                                <option value="homogeneous">Homogeneous System det(A) = 0</option>
-                                <option value="parametric">Parametric det(A - kI) = 0</option>
-                                <option value="custom">Custom Determinant Equation</option>
-                            </select>
-                        </div>
-                        
-                        <div class="det-equation-input">
-                            <div class="det-matrix-input">
-                                <h4>Matrix for Determinant Equation</h4>
-                                <div class="det-size-control">
-                                    <label>Matrix size:</label>
-                                    <select id="detMatrixSize" onchange="updateDetMatrixInputs()">
-                                        <option value="2">2×2</option>
-                                        <option value="3" selected>3×3</option>
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-calculator"></i> Matrix Operations</h3>
+                        <div class="matrix-operations-dropdown-panel">
+                            <div class="op-dropdown-row">
+                                <div class="op-select-group">
+                                    <label><i class="fas fa-tasks"></i> Select Operation:</label>
+                                    <select id="matrixOperationSelect" class="matrix-op-dropdown" onchange="handleMatrixOpDropdownChange()">
+                                        <optgroup label="── Two-Matrix Operations (A and B) ──">
+                                            <option value="multiply" selected>A × B (Multiplication)</option>
+                                            <option value="add">A + B (Addition)</option>
+                                            <option value="subtract">A - B (Subtraction)</option>
+                                            <option value="kronecker">A ⊗ B (Kronecker Product)</option>
+                                        </optgroup>
+                                        <optgroup label="── Single Matrix Operations (Matrix A) ──">
+                                            <option value="transposeA">Aᵀ (Transpose)</option>
+                                            <option value="determinantA">det(A) (Determinant)</option>
+                                            <option value="inverseA">A⁻¹ (Inverse)</option>
+                                            <option value="traceA">tr(A) (Trace)</option>
+                                            <option value="rankA">rank(A) (Rank)</option>
+                                            <option value="powerA">Aᵏ (Matrix Power)</option>
+                                            <option value="normA">||A|| (Matrix Norms)</option>
+                                            <option value="eigenvaluesA">Eigenvalues</option>
+                                            <option value="eigenvectorsA">Eigenvectors</option>
+                                            <option value="eigensystemA">Complete Eigen System</option>
+                                            <option value="scalarA">k × A (Scalar Multiplication)</option>
+                                        </optgroup>
+                                        <optgroup label="── Single Matrix Operations (Matrix B) ──">
+                                            <option value="transposeB">Bᵀ (Transpose)</option>
+                                            <option value="determinantB">det(B) (Determinant)</option>
+                                            <option value="inverseB">B⁻¹ (Inverse)</option>
+                                            <option value="traceB">tr(B) (Trace)</option>
+                                            <option value="rankB">rank(B) (Rank)</option>
+                                            <option value="powerB">Bᵏ (Matrix Power)</option>
+                                            <option value="normB">||B|| (Matrix Norms)</option>
+                                            <option value="scalarB">k × B (Scalar Multiplication)</option>
+                                        </optgroup>
                                     </select>
                                 </div>
-                                <div class="matrix-grid" id="detMatrixGrid"></div>
+                                
+                                <div id="scalarInputGroup" class="op-param-group" style="display: none;">
+                                    <label>Scalar (k):</label>
+                                    <input type="number" id="scalarValue" value="2" step="0.5" class="param-input">
+                                </div>
+
+                                <div id="powerInputGroup" class="op-param-group" style="display: none;">
+                                    <label>Exponent (k):</label>
+                                    <input type="number" id="matrixPowerVal" value="2" min="1" max="10" step="1" class="param-input">
+                                </div>
+
+                                <button class="btn btn-primary btn-calc-matrix" onclick="executeSelectedMatrixOperation()">
+                                    <i class="fas fa-play"></i> Calculate Operation
+                                </button>
                             </div>
-                            
-                            <div class="parameter-input" id="parameterInput">
-                                <label>Parameter (λ or k):</label>
-                                <input type="text" id="parameterSymbol" placeholder="λ" value="λ">
-                            </div>
-                            
-                            <button class="btn btn-solve-det" onclick="solveDeterminantEquation()">
-                                <i class="fas fa-calculator"></i> Solve Determinant Equation
-                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- Separate Results Sections -->
-                <div class="results-container">
                     <!-- Matrix Operations Results -->
                     <div class="matrix-section">
                         <h3><i class="fas fa-chart-bar"></i> Matrix Operations Results</h3>
                         <div class="matrix-result" id="matrixResult">
                             <p class="no-result">Matrix operation results will appear here...</p>
-                        </div>
-                    </div>
-
-                    <!-- Linear System Results -->
-                    <div class="matrix-section">
-                        <h3><i class="fas fa-equals"></i> Linear System Results</h3>
-                        <div class="matrix-result" id="linearSystemResult">
-                            <p class="no-result">Linear system solutions will appear here...</p>
-                        </div>
-                    </div>
-
-                    <!-- Determinant Equation Results -->
-                    <div class="matrix-section">
-                        <h3><i class="fas fa-square-root-alt"></i> Determinant Equation Results</h3>
-                        <div class="matrix-result" id="detEquationResult">
-                            <p class="no-result">Determinant equation solutions will appear here...</p>
                         </div>
                     </div>
 
@@ -1166,29 +1264,217 @@
                     </div>
                 </div>
 
-                <!-- Matrix Examples -->
-                <div class="matrix-section">
-                    <h3><i class="fas fa-lightbulb"></i> Quick Examples</h3>
-                    <div class="matrix-examples">
-                        <div class="example-card" onclick="loadMatrixExample('rotation')">
-                            <h4>2D Rotation</h4>
-                            <p>Rotation matrix</p>
-                            <small>cos θ, -sin θ, sin θ, cos θ</small>
+                <!-- Arbitrary & Large Matrices Tab (Up to 100x100) -->
+                <div class="matrix-section sub-tab-content hidden" id="matrixLarge">
+                    <h3><i class="fas fa-th-large"></i> Arbitrary & Large Matrices (Up to 100×100)</h3>
+                    <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 16px;">
+                        Generate or customize arbitrary matrices up to 100×100. Multiplication is optimized with cache-friendly loop ordering ($100 \times 100$ executes in ~8ms) and rendered via a smooth virtual paginated viewer.
+                    </p>
+
+                    <div class="large-matrix-grid-controls">
+                        <!-- Matrix A Controls -->
+                        <div class="large-matrix-card">
+                            <h4>Matrix A</h4>
+                            <div class="dim-inputs">
+                                <label>Rows:</label>
+                                <input type="number" id="largeRowsA" value="5" min="1" max="100">
+                                <label>Cols:</label>
+                                <input type="number" id="largeColsA" value="5" min="1" max="100">
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+                                <button class="btn btn-sm btn-matrix-action" onclick="generateRandomLargeMatrix('A', document.getElementById('largeRowsA').value, document.getElementById('largeColsA').value, -10, 10, true)">Random</button>
+                                <button class="btn btn-sm btn-matrix-action" onclick="setLargeIdentity('A', document.getElementById('largeRowsA').value)">Identity</button>
+                                <button class="btn btn-sm btn-matrix-action" onclick="setLargeMatrixView('A')">View A</button>
+                            </div>
+                            <details style="font-size: 0.85rem; color: #94a3b8; cursor: pointer;">
+                                <summary>Paste Custom Matrix A (CSV / spaces)</summary>
+                                <textarea id="customMatrixA" rows="3" style="width: 100%; margin-top: 6px; background: #0f172a; color: #fff; font-family: monospace; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px;" placeholder="1, 2, 3&#10;4, 5, 6"></textarea>
+                                <button class="btn btn-sm btn-matrix-action" style="margin-top: 4px;" onclick="parseCustomLargeMatrix('A', document.getElementById('customMatrixA').value)">Load A</button>
+                            </details>
                         </div>
-                        <div class="example-card" onclick="loadMatrixExample('system')">
-                            <h4>Linear System</h4>
-                            <p>3×3 system example</p>
-                            <small>Solvable system</small>
+
+                        <!-- Matrix B Controls -->
+                        <div class="large-matrix-card">
+                            <h4>Matrix B</h4>
+                            <div class="dim-inputs">
+                                <label>Rows:</label>
+                                <input type="number" id="largeRowsB" value="5" min="1" max="100">
+                                <label>Cols:</label>
+                                <input type="number" id="largeColsB" value="5" min="1" max="100">
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+                                <button class="btn btn-sm btn-matrix-action" onclick="generateRandomLargeMatrix('B', document.getElementById('largeRowsB').value, document.getElementById('largeColsB').value, -10, 10, true)">Random</button>
+                                <button class="btn btn-sm btn-matrix-action" onclick="setLargeIdentity('B', document.getElementById('largeRowsB').value)">Identity</button>
+                                <button class="btn btn-sm btn-matrix-action" onclick="setLargeMatrixView('B')">View B</button>
+                            </div>
+                            <details style="font-size: 0.85rem; color: #94a3b8; cursor: pointer;">
+                                <summary>Paste Custom Matrix B (CSV / spaces)</summary>
+                                <textarea id="customMatrixB" rows="3" style="width: 100%; margin-top: 6px; background: #0f172a; color: #fff; font-family: monospace; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px;" placeholder="1, 0, 0&#10;0, 1, 0"></textarea>
+                                <button class="btn btn-sm btn-matrix-action" style="margin-top: 4px;" onclick="parseCustomLargeMatrix('B', document.getElementById('customMatrixB').value)">Load B</button>
+                            </details>
                         </div>
-                        <div class="example-card" onclick="loadMatrixExample('symmetric')">
-                            <h4>Symmetric Matrix</h4>
-                            <p>Eigenvalue example</p>
-                            <small>Real eigenvalues</small>
+                    </div>
+
+                    <!-- Quick Presets -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; align-items: center;">
+                        <span style="font-size: 0.85rem; color: #cbd5e1; font-weight: 600;">Presets:</span>
+                        <button class="btn btn-sm btn-matrix-action" onclick="document.getElementById('largeRowsA').value=10; document.getElementById('largeColsA').value=10; document.getElementById('largeRowsB').value=10; document.getElementById('largeColsB').value=10; generateRandomLargeMatrix('A', 10, 10); generateRandomLargeMatrix('B', 10, 10);">Random 10×10</button>
+                        <button class="btn btn-sm btn-matrix-action" onclick="document.getElementById('largeRowsA').value=50; document.getElementById('largeColsA').value=50; document.getElementById('largeRowsB').value=50; document.getElementById('largeColsB').value=50; generateRandomLargeMatrix('A', 50, 50); generateRandomLargeMatrix('B', 50, 50);">Random 50×50</button>
+                        <button class="btn btn-sm btn-matrix-action" style="background: rgba(59, 130, 246, 0.25);" onclick="document.getElementById('largeRowsA').value=100; document.getElementById('largeColsA').value=100; document.getElementById('largeRowsB').value=100; document.getElementById('largeColsB').value=100; generateRandomLargeMatrix('A', 100, 100); generateRandomLargeMatrix('B', 100, 100);">⚡ Random 100×100</button>
+                        <button class="btn btn-sm btn-matrix-action" onclick="document.getElementById('largeRowsA').value=100; document.getElementById('largeColsA').value=100; setLargeIdentity('A', 100);">Identity 100×100</button>
+                    </div>
+
+                    <!-- Operations Bar -->
+                    <div class="large-matrix-actions-bar">
+                        <button class="btn btn-primary btn-sm" onclick="multiplyLargeMatricesOp()"><i class="fas fa-times"></i> A × B</button>
+                        <button class="btn btn-matrix-op btn-sm" onclick="addLargeMatricesOp()"><i class="fas fa-plus"></i> A + B</button>
+                        <button class="btn btn-matrix-op btn-sm" onclick="subtractLargeMatricesOp()"><i class="fas fa-minus"></i> A - B</button>
+                        <button class="btn btn-matrix-op btn-sm" onclick="transposeLargeMatrixOp('A')"><i class="fas fa-arrows-alt"></i> Transpose Aᵀ</button>
+                        <button class="btn btn-matrix-op btn-sm" onclick="transposeLargeMatrixOp('B')"><i class="fas fa-arrows-alt"></i> Transpose Bᵀ</button>
+                        <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                            <label style="font-size: 0.85rem;">Scalar:</label>
+                            <input type="number" id="largeScalar" value="2" style="width: 55px; padding: 4px; border-radius: 4px; background: #0f172a; color: #fff; text-align: center;">
+                            <button class="btn btn-matrix-op btn-sm" onclick="scalarMultiplyLargeOp('A', document.getElementById('largeScalar').value)">Scalar × A</button>
                         </div>
-                        <div class="example-card" onclick="loadMatrixExample('singular')">
-                            <h4>Singular Matrix</h4>
-                            <p>Non-invertible</p>
-                            <small>Determinant = 0</small>
+                    </div>
+
+                    <!-- Paginated Virtual Viewer -->
+                    <div id="largeMatrixViewer">
+                        <p class="no-result">No matrix data generated yet. Click Generate or Presets to begin.</p>
+                    </div>
+                </div>
+
+                <!-- Linear Equations Tab -->
+                <div class="sub-tab-content hidden" id="matrixLinear">
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-equals"></i> Linear Equations Solver</h3>
+                        <div class="linear-equations">
+                            <div class="equation-method-selector">
+                                <label>Solution Method:</label>
+                                <select id="solutionMethod">
+                                    <option value="cramer">Cramer's Rule</option>
+                                    <option value="gaussian">Gaussian Elimination</option>
+                                    <option value="matrix">Matrix Method (A⁻¹B)</option>
+                                    <option value="lu">LU Decomposition</option>
+                                </select>
+                            </div>
+                            
+                            <div class="equation-input">
+                                <div class="equation-description">
+                                    <p>Solve system: Ax = b</p>
+                                    <small>Enter coefficient matrix A and constants vector b</small>
+                                </div>
+                                
+                                <div class="equation-matrices">
+                                    <div class="coefficient-matrix">
+                                        <h4>Coefficient Matrix (A)</h4>
+                                        <div class="matrix-size-control">
+                                            <label>System size:</label>
+                                            <select id="systemSize" onchange="updateSystemInputs()">
+                                                <option value="2">2×2 system</option>
+                                                <option value="3" selected>3×3 system</option>
+                                                <option value="4">4×4 system</option>
+                                            </select>
+                                        </div>
+                                        <div class="matrix-grid" id="coefficientGrid"></div>
+                                    </div>
+                                    
+                                    <div class="constants-vector">
+                                        <h4>Constants Vector (b)</h4>
+                                        <div class="vector-grid" id="constantsGrid"></div>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn btn-solve-system" onclick="solveLinearSystem()">
+                                    <i class="fas fa-calculator"></i> Solve System
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Linear System Results -->
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-equals"></i> Linear System Results</h3>
+                        <div class="matrix-result" id="linearSystemResult">
+                            <p class="no-result">Linear system solutions will appear here...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Determinant Rules Tab -->
+                <div class="sub-tab-content hidden" id="matrixDet">
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-square-root-alt"></i> Determinant Rule Equations</h3>
+                        <div class="determinant-equations">
+                            <div class="det-equation-selector">
+                                <label>Equation Type:</label>
+                                <select id="detEquationType">
+                                    <option value="characteristic">Characteristic Equation det(A - λI) = 0</option>
+                                    <option value="homogeneous">Homogeneous System det(A) = 0</option>
+                                    <option value="parametric">Parametric det(A - kI) = 0</option>
+                                    <option value="custom">Custom Determinant Equation</option>
+                                </select>
+                            </div>
+                            
+                            <div class="det-equation-input">
+                                <div class="det-matrix-input">
+                                    <h4>Matrix for Determinant Equation</h4>
+                                    <div class="det-size-control">
+                                        <label>Matrix size:</label>
+                                        <select id="detMatrixSize" onchange="updateDetMatrixInputs()">
+                                            <option value="2">2×2</option>
+                                            <option value="3" selected>3×3</option>
+                                        </select>
+                                    </div>
+                                    <div class="matrix-grid" id="detMatrixGrid"></div>
+                                </div>
+                                
+                                <div class="parameter-input" id="parameterInput">
+                                    <label>Parameter (λ or k):</label>
+                                    <input type="text" id="parameterSymbol" placeholder="λ" value="λ">
+                                </div>
+                                
+                                <button class="btn btn-solve-det" onclick="solveDeterminantEquation()">
+                                    <i class="fas fa-calculator"></i> Solve Determinant Equation
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Determinant Equation Results -->
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-square-root-alt"></i> Determinant Equation Results</h3>
+                        <div class="matrix-result" id="detEquationResult">
+                            <p class="no-result">Determinant equation solutions will appear here...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Matrix Examples Tab -->
+                <div class="sub-tab-content hidden" id="matrixExamples">
+                    <div class="matrix-section">
+                        <h3><i class="fas fa-lightbulb"></i> Quick Examples</h3>
+                        <div class="matrix-examples">
+                            <div class="example-card" onclick="loadMatrixExample('rotation')">
+                                <h4>2D Rotation</h4>
+                                <p>Rotation matrix</p>
+                                <small>cos θ, -sin θ, sin θ, cos θ</small>
+                            </div>
+                            <div class="example-card" onclick="loadMatrixExample('system')">
+                                <h4>Linear System</h4>
+                                <p>3×3 system example</p>
+                                <small>Solvable system</small>
+                            </div>
+                            <div class="example-card" onclick="loadMatrixExample('symmetric')">
+                                <h4>Symmetric Matrix</h4>
+                                <p>Eigenvalue example</p>
+                                <small>Real eigenvalues</small>
+                            </div>
+                            <div class="example-card" onclick="loadMatrixExample('singular')">
+                                <h4>Singular Matrix</h4>
+                                <p>Non-invertible</p>
+                                <small>Determinant = 0</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1196,11 +1482,40 @@
 
             <!-- GPA Calculator Mode -->
             <div class="gpa-mode hidden" id="gpaMode">
+                <div class="sub-nav-container">
+                    <div class="sub-nav-tabs">
+                        <button class="sub-tab-btn active" data-tab="gpaCourses" onclick="switchSubTab('gpaMode', 'gpaCourses')">
+                            <i class="fas fa-graduation-cap"></i> Course Calculator
+                        </button>
+                        <button class="sub-tab-btn" data-tab="gpaAnalysis" onclick="switchSubTab('gpaMode', 'gpaAnalysis')">
+                            <i class="fas fa-chart-line"></i> GPA Analysis
+                        </button>
+                        <button class="sub-tab-btn" data-tab="gpaCumulative" onclick="switchSubTab('gpaMode', 'gpaCumulative')">
+                            <i class="fas fa-history"></i> Cumulative GPA
+                        </button>
+                        <button class="sub-tab-btn" data-tab="gpaGoals" onclick="switchSubTab('gpaMode', 'gpaGoals')">
+                            <i class="fas fa-bullseye"></i> Goals & Predictions
+                        </button>
+                        <button class="sub-tab-btn" data-tab="gpaTips" onclick="switchSubTab('gpaMode', 'gpaTips')">
+                            <i class="fas fa-lightbulb"></i> Scale & Tips
+                        </button>
+                    </div>
+                    <div class="sub-tab-selector-wrapper">
+                        <select class="sub-tab-selector" onchange="switchSubTab('gpaMode', this.value)">
+                            <option value="gpaCourses">Course Calculator (Unlimited Courses)</option>
+                            <option value="gpaAnalysis">GPA Analysis & Breakdown</option>
+                            <option value="gpaCumulative">Cumulative GPA Calculator</option>
+                            <option value="gpaGoals">GPA Goals & Predictions</option>
+                            <option value="gpaTips">Scale Reference & Tips</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- GPA Input Section -->
-                <div class="gpa-section">
+                <div class="gpa-section sub-tab-content" id="gpaCourses">
                     <h3><i class="fas fa-graduation-cap"></i> GPA Calculator</h3>
                     <div class="gpa-description">
-                        <p>Calculate your Grade Point Average (GPA) for up to 7 courses</p>
+                        <p>Calculate your Grade Point Average (GPA) with dynamic, unlimited courses</p>
                         <small>Enter course details and grades to calculate your semester/cumulative GPA</small>
                     </div>
                     
@@ -1228,15 +1543,11 @@
                             
                             <div class="active-courses">
                                 <label>Number of Courses:</label>
-                                <select id="numCourses" onchange="updateCourseInputs()">
-                                    <option value="1">1 Course</option>
-                                    <option value="2">2 Courses</option>
-                                    <option value="3">3 Courses</option>
-                                    <option value="4">4 Courses</option>
-                                    <option value="5">5 Courses</option>
-                                    <option value="6">6 Courses</option>
-                                    <option value="7" selected>7 Courses</option>
-                                </select>
+                                <div class="course-stepper">
+                                    <input type="number" id="numCourses" value="5" min="1" max="100" class="num-courses-input" onchange="updateCourseInputs()">
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="addCourse()" title="Add Course"><i class="fas fa-plus"></i> Add</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="removeLastCourse()" title="Remove Last Course"><i class="fas fa-minus"></i> Remove</button>
+                                </div>
                             </div>
                         </div>
                         
@@ -1259,7 +1570,7 @@
                 </div>
 
                 <!-- GPA Analysis Section -->
-                <div class="gpa-section">
+                <div class="gpa-section sub-tab-content hidden" id="gpaAnalysis">
                     <h3><i class="fas fa-chart-line"></i> GPA Analysis</h3>
                     <div class="gpa-analysis-container">
                         <div class="gpa-summary" id="gpaSummary">
@@ -1292,7 +1603,7 @@
                 </div>
 
                 <!-- Cumulative GPA Section -->
-                <div class="gpa-section">
+                <div class="gpa-section sub-tab-content hidden" id="gpaCumulative">
                     <h3><i class="fas fa-history"></i> Cumulative GPA Calculator</h3>
                     <div class="cumulative-gpa">
                         <div class="cumulative-inputs">
@@ -1316,8 +1627,8 @@
                 </div>
 
                 <!-- GPA Goals Section -->
-                <div class="gpa-section">
-                    <h3><i class="fas fa-target"></i> GPA Goals & Predictions</h3>
+                <div class="gpa-section sub-tab-content hidden" id="gpaGoals">
+                    <h3><i class="fas fa-bullseye"></i> GPA Goals & Predictions</h3>
                     <div class="gpa-goals">
                         <div class="goal-inputs">
                             <div class="input-group">
@@ -1340,7 +1651,7 @@
                 </div>
 
                 <!-- GPA Tips Section -->
-                <div class="gpa-section">
+                <div class="gpa-section sub-tab-content hidden" id="gpaTips">
                     <h3><i class="fas fa-lightbulb"></i> GPA Tips & Grade Scale</h3>
                     <div class="gpa-tips">
                         <div class="grade-scale-reference" id="gradeScaleRef">
@@ -1364,10 +1675,18 @@
             <!-- History Panel -->
             <div class="history-panel" id="historyPanel">
                 <div class="history-header">
-                    <h3><i class="fas fa-history"></i> History</h3>
-                    <button class="btn-clear-history" onclick="clearHistory()">
-                        <i class="fas fa-trash"></i> Clear
+                    <button class="btn-back-history" onclick="toggleHistory()" aria-label="Back to Calculator" title="Back to Calculator">
+                        <i class="fas fa-arrow-left"></i> Back
                     </button>
+                    <h3><i class="fas fa-history"></i> History</h3>
+                    <div class="history-header-actions">
+                        <button class="btn-export-history" onclick="exportHistory('csv')" title="Export CSV">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn-clear-history" onclick="clearHistory()" title="Clear History">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="history-list" id="historyList">
                     <p class="no-history">No calculations yet</p>
@@ -1379,6 +1698,116 @@
                 <i class="fas fa-history"></i>
             </button>
         </div>
+    </div>
+
+    <!-- PWA Install Widget (Glossy Neon Green Pill matching user specification) -->
+    <div class="pwa-install-container" id="pwaInstallContainer">
+        <!-- Dismiss Button -->
+        <button class="btn-dismiss-install" onclick="dismissInstallPrompt()" title="Dismiss" aria-label="Dismiss Install Prompt">&times;</button>
+
+        <!-- Bottom Curved Floor Glow -->
+        <svg class="install-floor-ring" viewBox="0 0 360 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 12 35 C 40 68, 320 68, 348 35 C 315 58, 45 58, 12 35 Z" fill="url(#floorGlowGrad)" />
+            <defs>
+                <linearGradient id="floorGlowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#22c55e" stop-opacity="0" />
+                    <stop offset="25%" stop-color="#22c55e" stop-opacity="0.85" />
+                    <stop offset="50%" stop-color="#4ade80" stop-opacity="1" />
+                    <stop offset="75%" stop-color="#22c55e" stop-opacity="0.85" />
+                    <stop offset="100%" stop-color="#22c55e" stop-opacity="0" />
+                </linearGradient>
+            </defs>
+        </svg>
+
+        <!-- Top-Left Green Rays -->
+        <svg class="install-rays-left" viewBox="0 0 60 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 46 42 L 26 10" stroke="#4ade80" stroke-width="6.5" stroke-linecap="round" />
+            <path d="M 38 46 L 8 24" stroke="#4ade80" stroke-width="6" stroke-linecap="round" />
+            <path d="M 34 50 L 5 44" stroke="#22c55e" stroke-width="5.5" stroke-linecap="round" />
+        </svg>
+
+        <!-- Top-Right Golden Yellow Rays -->
+        <svg class="install-rays-right" viewBox="0 0 58 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 14 42 L 32 10" stroke="#facc15" stroke-width="6.5" stroke-linecap="round" />
+            <path d="M 22 46 L 50 24" stroke="#facc15" stroke-width="6.5" stroke-linecap="round" />
+            <path d="M 26 50 L 54 44" stroke="#eab308" stroke-width="5.5" stroke-linecap="round" />
+        </svg>
+
+        <!-- Main Capsule Pill Button -->
+        <button class="pwa-install-pill" id="pwaInstallBtn" onclick="triggerPwaInstall()" aria-label="Install the App">
+            <!-- Gloss Shine Overlay -->
+            <div class="pill-gloss-shine"></div>
+
+            <!-- Download Tray Icon -->
+            <div class="pill-download-box">
+                <svg class="pill-download-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M 14 3 L 14 15 M 8.5 10.5 L 14 16 L 19.5 10.5" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M 5 16.5 V 20 C 5 21.6 6.4 23 8 23 H 20 C 21.6 23 23 21.6 23 20 V 16.5" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <!-- Divider Line -->
+            <div class="pill-divider"></div>
+
+            <!-- Button Typography -->
+            <span class="pill-label">Install the App</span>
+
+            <!-- Concentric Target Circle -->
+            <div class="pill-target-box">
+                <svg class="pill-target-svg" viewBox="0 0 54 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Outer Ring -->
+                    <circle cx="27" cy="27" r="23" stroke="#86efac" stroke-width="3.5" fill="#15803d" />
+                    <!-- Middle Ring -->
+                    <circle cx="27" cy="27" r="15" stroke="#4ade80" stroke-width="3.2" fill="#166534" />
+                    <!-- Bullseye Center -->
+                    <circle cx="27" cy="27" r="7.5" fill="#dcfce7" stroke="#ffffff" stroke-width="2" />
+                </svg>
+            </div>
+
+            <!-- Cartoon White Glove Pointer Hand with Green Cuff -->
+            <div class="pill-hand-pointer">
+                <i class="fas fa-hand-pointer install-pointer-icon" style="display:none;" aria-hidden="true"></i>
+                <svg class="pill-hand-svg" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g class="hand-tap-anim">
+                        <!-- Green Wrist Cuff -->
+                        <g id="hand-wrist-cuff">
+                            <!-- Base shadow -->
+                            <path d="M 58 84 C 54 80, 64 72, 76 78 C 86 84, 88 92, 82 98 C 76 103, 64 100, 58 92 Z" fill="#065f46" stroke="#111827" stroke-width="3.5" stroke-linejoin="round" />
+                            <!-- Vibrant neon green collar -->
+                            <path d="M 54 82 C 50 77, 60 70, 72 75 C 82 80, 85 88, 79 94 C 73 100, 61 98, 54 90 Z" fill="#22c55e" stroke="#111827" stroke-width="3.5" stroke-linejoin="round" />
+                            <!-- Highlight -->
+                            <ellipse cx="68" cy="84" rx="9" ry="4" transform="rotate(-35 68 84)" fill="#86efac" />
+                        </g>
+
+                        <!-- Glove Hand Body & Folded Fingers -->
+                        <path d="M 14 14
+                                 C 10 18, 10 24, 15 28
+                                 L 36 46
+                                 C 32 48, 26 53, 27 60
+                                 C 28 66, 35 68, 42 64
+                                 C 44 68, 48 76, 54 78
+                                 L 62 84
+                                 C 74 88, 86 82, 84 72
+                                 C 89 67, 88 58, 82 54
+                                 C 86 49, 83 40, 76 37
+                                 C 71 34, 63 36, 57 40
+                                 L 25 12
+                                 C 21 8, 16 9, 14 14
+                                 Z" 
+                              fill="#ffffff" stroke="#111827" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                        
+                        <!-- 3D Shading on glove underside -->
+                        <path d="M 42 64 C 44 68, 48 76, 54 78 L 62 84 C 74 88, 86 82, 84 72 C 81 70, 73 72, 63 68 C 53 64, 46 64, 42 64 Z" fill="#e2e8f0" />
+                        
+                        <!-- Finger Crease Lines -->
+                        <path d="M 56 42 C 62 46, 68 47, 72 43" stroke="#111827" stroke-width="3" stroke-linecap="round" />
+                        <path d="M 62 53 C 67 57, 73 57, 77 53" stroke="#111827" stroke-width="3" stroke-linecap="round" />
+                        <path d="M 67 63 C 71 67, 76 67, 80 62" stroke="#111827" stroke-width="3" stroke-linecap="round" />
+                        <path d="M 36 50 C 38 56, 44 59, 48 56" stroke="#cbd5e1" stroke-width="2.5" stroke-linecap="round" />
+                    </g>
+                </svg>
+            </div>
+        </button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
@@ -1399,49 +1828,43 @@
             });
         }
 
-        // PWA Install Prompt
+        // PWA Install Prompt State & Handlers
         let deferredPrompt;
-        const installButton = document.createElement('button');
-        installButton.innerHTML = '<i class="fas fa-download"></i> Install App';
-        installButton.className = 'install-button hidden';
-        installButton.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            background: var(--success);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-            z-index: 1000;
-            transition: all 0.3s;
-        `;
-        
-        document.body.appendChild(installButton);
 
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            installButton.classList.remove('hidden');
+            const container = document.getElementById('pwaInstallContainer');
+            if (container) container.classList.remove('pwa-hidden');
         });
 
-        installButton.addEventListener('click', async () => {
+        async function triggerPwaInstall() {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                console.log(`User response to the install prompt: ${outcome}`);
+                console.log(`User response to install: ${outcome}`);
                 deferredPrompt = null;
-                installButton.classList.add('hidden');
+                dismissInstallPrompt();
+            } else {
+                showNotification('To install: click the Install icon (⊕) in your browser address bar or Menu ⋮ → "Install App"');
             }
-        });
+        }
+
+        function dismissInstallPrompt() {
+            const container = document.getElementById('pwaInstallContainer');
+            if (container) {
+                container.style.opacity = '0';
+                container.style.transform = 'translateY(16px)';
+                setTimeout(() => {
+                    container.style.display = 'none';
+                }, 300);
+            }
+        }
 
         window.addEventListener('appinstalled', () => {
             console.log('PWA was installed');
-            installButton.classList.add('hidden');
-            showNotification('Calculator app installed successfully!');
+            dismissInstallPrompt();
+            showNotification('Scientific Calculator installed successfully!');
         });
 
         // Handle URL parameters for shortcuts
@@ -1453,5 +1876,81 @@
             }
         });
     </script>
+    <!-- Settings Modal Backdrop -->
+    <div class="calculator-modal-backdrop" id="settingsModalBackdrop" onclick="if(event.target===this) closeSettings()">
+        <div class="calculator-modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+            <div class="modal-header">
+                <h3 id="settingsModalTitle"><i class="fas fa-cog"></i> Calculator Settings</h3>
+                <button class="btn-close-modal" onclick="closeSettings()" aria-label="Close Settings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <div>
+                        <span class="setting-label">Angle Measurement</span>
+                        <span class="setting-desc">Trigonometric input & output units</span>
+                    </div>
+                    <div class="setting-control">
+                        <select id="settingAngleUnit" onchange="updateSetting('angleUnit', this.value)">
+                            <option value="deg">Degrees (°)</option>
+                            <option value="rad">Radians (rad)</option>
+                            <option value="grad">Gradians (grad)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div>
+                        <span class="setting-label">Decimal Precision</span>
+                        <span class="setting-desc">Number of digits displayed in results</span>
+                    </div>
+                    <div class="setting-control">
+                        <select id="settingPrecision" onchange="updateSetting('precision', parseInt(this.value))">
+                            <option value="4">4 Decimal Places</option>
+                            <option value="6">6 Decimal Places</option>
+                            <option value="8">8 Decimal Places</option>
+                            <option value="12" selected>12 Decimal Places (Standard)</option>
+                            <option value="16">16 Decimal Places (High)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div>
+                        <span class="setting-label">Number Notation</span>
+                        <span class="setting-desc">Standard decimal or scientific notation</span>
+                    </div>
+                    <div class="setting-control">
+                        <select id="settingNotation" onchange="updateSetting('notation', this.value)">
+                            <option value="auto" selected>Auto (Standard)</option>
+                            <option value="scientific">Scientific (e.g., 1.23e+4)</option>
+                            <option value="engineering">Engineering</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div>
+                        <span class="setting-label">Detailed Error Explanations</span>
+                        <span class="setting-desc">Show mathematical cause for errors</span>
+                    </div>
+                    <div class="setting-control">
+                        <select id="settingDetailedErrors" onchange="updateSetting('detailedErrors', this.value === 'true')">
+                            <option value="true" selected>Enabled (Detailed)</option>
+                            <option value="false">Simple ("Error")</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+                    <button class="btn btn-secondary" onclick="resetCalculatorSettings()" style="padding: 8px 16px; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; border-radius: 6px; cursor: pointer;">
+                        <i class="fas fa-undo"></i> Reset to Default
+                    </button>
+                    <button class="btn btn-primary" onclick="closeSettings()" style="padding: 8px 20px; background: #3b82f6; border: none; color: #fff; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -25,6 +25,47 @@ const historyDisplay = document.getElementById('historyDisplay');
 const expressionDisplay = document.getElementById('expressionDisplay');
 const memoryValue = document.getElementById('memoryValue');
 
+// Responsive Hamburger Menu Controls
+function openHamburgerMenu() {
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    if (hamburgerMenu) {
+        hamburgerMenu.classList.remove('hidden');
+        hamburgerMenu.classList.add('open');
+        if (typeof hamburgerMenu.setAttribute === 'function') {
+            hamburgerMenu.setAttribute('aria-hidden', 'false');
+        }
+    }
+    if (menuBackdrop) {
+        menuBackdrop.classList.add('active');
+    }
+    if (typeof document.querySelector === 'function') {
+        const modeToggle = document.querySelector('.mode-toggle');
+        if (modeToggle) modeToggle.style.display = 'none';
+    }
+}
+
+function closeHamburgerMenu() {
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    const menuBackdrop = document.getElementById('menuBackdrop');
+    if (hamburgerMenu) {
+        hamburgerMenu.classList.remove('open');
+        hamburgerMenu.classList.add('hidden');
+        if (typeof hamburgerMenu.setAttribute === 'function') {
+            hamburgerMenu.setAttribute('aria-hidden', 'true');
+        }
+    }
+    if (menuBackdrop) {
+        menuBackdrop.classList.remove('active');
+    }
+    if (typeof document.querySelector === 'function') {
+        const modeToggle = document.querySelector('.mode-toggle');
+        if (modeToggle) {
+            modeToggle.style.display = '';
+        }
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
@@ -34,30 +75,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const hamburgerMenu = document.getElementById('hamburgerMenu');
     const closeMenuBtn = document.getElementById('closeMenuBtn');
     const menuInstallBtn = document.getElementById('menuInstallBtn');
+    const menuBackdrop = document.getElementById('menuBackdrop');
 
-    if (hamburgerBtn && hamburgerMenu) {
-        hamburgerBtn.addEventListener('click', () => {
-            hamburgerMenu.classList.remove('hidden');
-            hamburgerMenu.classList.add('open');
-            hamburgerMenu.setAttribute('aria-hidden', 'false');
-            // when hamburger menu opens, hide the top mode toggle for clarity
-            const modeToggle = document.querySelector('.mode-toggle');
-            if (modeToggle) modeToggle.style.display = 'none';
-        });
+    if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', openHamburgerMenu);
     }
 
-    if (closeMenuBtn && hamburgerMenu) {
-        closeMenuBtn.addEventListener('click', () => {
-            hamburgerMenu.classList.remove('open');
-            hamburgerMenu.classList.add('hidden');
-            hamburgerMenu.setAttribute('aria-hidden', 'true');
-            // restore mode toggle visibility based on viewport
-            const modeToggle = document.querySelector('.mode-toggle');
-            if (modeToggle) {
-                // allow CSS to control it on larger screens
-                modeToggle.style.display = '';
-            }
-        });
+    if (closeMenuBtn) {
+        closeMenuBtn.addEventListener('click', closeHamburgerMenu);
+    }
+
+    if (menuBackdrop) {
+        menuBackdrop.addEventListener('click', closeHamburgerMenu);
     }
 
     // Ensure mode-toggle is hidden whenever the hamburger is visible (responsive fallback)
@@ -95,8 +124,10 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 });
 
 function switchMode(mode) {
+    closeHamburgerMenu();
     document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+    const targetBtn = document.querySelector(`[data-mode="${mode}"]`);
+    if (targetBtn) targetBtn.classList.add('active');
     
     document.getElementById('basicMode').classList.add('hidden');
     document.getElementById('advancedMode').classList.add('hidden');
@@ -130,17 +161,145 @@ function switchMode(mode) {
     }
 }
 
-// Display functions
+// Universal Sub-Tab Switcher for uncluttered navigation
+function switchSubTab(modeId, tabId) {
+    const modeEl = document.getElementById(modeId);
+    if (!modeEl) return;
+    
+    // Update sub-tab buttons
+    const btns = modeEl.querySelectorAll('.sub-tab-btn');
+    btns.forEach(btn => {
+        const isMatch = btn.getAttribute('data-tab') === tabId;
+        btn.classList.toggle('active', isMatch);
+    });
+    
+    // Update dropdown selector if present
+    const selector = modeEl.querySelector('.sub-tab-selector');
+    if (selector && selector.value !== tabId) {
+        selector.value = tabId;
+    }
+    
+    // Update content panes
+    const contents = modeEl.querySelectorAll('.sub-tab-content');
+    contents.forEach(content => {
+        if (content.id === tabId) {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+    });
+}
+
+// Display & Helper functions
+function isErrorState(val) {
+    if (typeof val !== 'string') return false;
+    return val === 'Error' || val.startsWith('Error') || val.includes('Error');
+}
+
+// Convert between decimal and fraction (e.g. 0.75 <-> 3/4)
+function decimalToFraction(val, maxDenominator = 1000000, tolerance = 1e-9) {
+    if (typeof val === 'string' && val.includes('/')) {
+        const parts = val.split('/');
+        if (parts.length === 2) {
+            const num = parseFloat(parts[0]);
+            const den = parseFloat(parts[1]);
+            if (den !== 0) return (num / den).toString();
+        }
+    }
+    const numVal = parseFloat(val);
+    if (isNaN(numVal)) return val;
+    if (Number.isInteger(numVal)) return numVal.toString();
+    
+    const sign = numVal < 0 ? -1 : 1;
+    let x = Math.abs(numVal);
+    let h1 = 1, h2 = 0, k1 = 0, k2 = 1;
+    let b = x;
+    do {
+        let a = Math.floor(b);
+        let aux = h1;
+        h1 = a * h1 + h2;
+        h2 = aux;
+        aux = k1;
+        k1 = a * k1 + k2;
+        k2 = aux;
+        b = 1 / (b - a);
+    } while (Math.abs(x - h1 / k1) > x * tolerance && k1 < maxDenominator);
+
+    const numerator = sign * h1;
+    const denominator = k1;
+    if (denominator === 1) return numerator.toString();
+    return `${numerator}/${denominator}`;
+}
+
+// Detailed error message diagnosis
+function getDetailedErrorMessage(error, expr) {
+    if (!expr || expr.trim() === '') {
+        return 'Syntax Error: Empty expression';
+    }
+    const clean = expr.trim();
+    
+    // Check unmatched parentheses
+    const openParens = (clean.match(/\(/g) || []).length;
+    const closeParens = (clean.match(/\)/g) || []).length;
+    if (openParens !== closeParens) {
+        return `Syntax Error: Unmatched parentheses (${openParens} '(' vs ${closeParens} ')')`;
+    }
+    
+    // Check division by zero: / 0 or / 0.0 or / (0)
+    if (/\/\s*0(?![.0-9])|\/\s*0\.0*(?![1-9])|\/\s*\(\s*0\s*\)/.test(clean)) {
+        return 'Math Error: Division by zero';
+    }
+    
+    // Check trailing operator
+    if (/[\+\-\*\/\%\^]\s*$/.test(clean)) {
+        return 'Syntax Error: Incomplete expression with trailing operator';
+    }
+    
+    // Check consecutive invalid operators (e.g., ++, **, //, *+, +*)
+    if (/[\+\*\/\%\^]{2,}/.test(clean.replace(/\*\*/g, ''))) {
+        return 'Syntax Error: Invalid consecutive operators';
+    }
+    
+    // Check domain errors
+    if (/sqrt\s*\(\s*-\d+/.test(clean)) {
+        return 'Domain Error: Negative square root';
+    }
+    if (/log\s*\(\s*-\d+|ln\s*\(\s*-\d+|log\s*\(\s*0\s*\)|ln\s*\(\s*0\s*\)/.test(clean)) {
+        return 'Domain Error: Non-positive argument for logarithm';
+    }
+
+    if (error && error.message) {
+        return error.message.startsWith('Error') || error.message.includes('Error') ? error.message : `Error: ${error.message}`;
+    }
+    
+    return 'Calculation Error: Invalid mathematical syntax';
+}
+
 // Remove IEEE-754 precision artifacts like 0.1 + 0.2 = 0.30000000000000004
 function formatResult(val) {
     if (typeof val !== 'number' || isNaN(val)) return 'Error';
     if (!isFinite(val)) return val > 0 ? 'Infinity' : '-Infinity';
-    const rounded = parseFloat(val.toPrecision(12));
+    const precision = (typeof settingsState !== 'undefined' && settingsState.precision) ? settingsState.precision : 12;
+    const notation = (typeof settingsState !== 'undefined' && settingsState.notation) ? settingsState.notation : 'auto';
+    
+    if (notation === 'scientific') {
+        return val.toExponential(Math.min(precision, 8));
+    }
+    const rounded = parseFloat(val.toPrecision(precision));
     return rounded.toString();
 }
 
 function updateDisplay() {
     mainDisplay.textContent = currentInput;
+    if (mainDisplay && mainDisplay.style) {
+        if (typeof currentInput === 'string' && isErrorState(currentInput)) {
+            mainDisplay.style.fontSize = '1.1rem';
+            mainDisplay.style.color = '#f87171';
+        } else {
+            mainDisplay.style.fontSize = (typeof currentInput === 'string' && currentInput.length > 14) ? '1.5rem' : '';
+            mainDisplay.style.color = '';
+        }
+    }
     if (expressionChain) {
         historyDisplay.textContent = expressionChain;
     } else if (previousInput && operation) {
@@ -152,7 +311,7 @@ function updateDisplay() {
 
 function appendNumber(num) {
     if (num === '.') {
-        if (currentInput === '0' || currentInput === 'Error' || !currentInput) {
+        if (currentInput === '0' || isErrorState(currentInput) || !currentInput) {
             currentInput = '0.';
         } else if (currentInput.includes('.')) {
             return; // Prevent duplicate decimal points
@@ -160,7 +319,7 @@ function appendNumber(num) {
             currentInput += '.';
         }
     } else {
-        if (currentInput === '0' || currentInput === 'Error') {
+        if (currentInput === '0' || isErrorState(currentInput)) {
             currentInput = num;
         } else {
             currentInput += num;
@@ -170,7 +329,7 @@ function appendNumber(num) {
 }
 
 function appendOperator(op) {
-    if (currentInput === 'Error') return;
+    if (isErrorState(currentInput)) return;
     
     const opSym = (op === 'mod') ? '%' : op;
     
@@ -193,7 +352,7 @@ function appendOperator(op) {
 }
 
 function appendFunction(func) {
-    if (currentInput === '0' || currentInput === 'Error') {
+    if (currentInput === '0' || isErrorState(currentInput)) {
         currentInput = func;
     } else {
         currentInput += func;
@@ -253,6 +412,11 @@ function evaluateArithmetic(val) {
     if (!/^[0-9+\-*/%^().\s eE]+$/.test(val)) {
         return NaN;
     }
+
+    // Check division by zero: / 0 or / 0.0 or / (0)
+    if (/\/\s*0(?![.0-9])|\/\s*0\.0*(?![1-9])|\/\s*\(\s*0\s*\)/.test(val)) {
+        throw new Error('Math Error: Division by zero');
+    }
     
     try {
         const sanitized = val.replace(/\^/g, '**');
@@ -264,14 +428,14 @@ function evaluateArithmetic(val) {
         const res = fn(undefined, undefined, undefined);
         return typeof res === 'number' && isFinite(res) ? res : NaN;
     } catch (e) {
-        return NaN;
+        throw e;
     }
 }
 
 // Basic operations with PEMDAS operator precedence & precision formatting
 function calculate() {
+    let fullExpr = '';
     try {
-        let fullExpr = '';
         if (expressionChain) {
             fullExpr = `${expressionChain} ${currentInput}`.trim();
         } else if (currentInput) {
@@ -292,7 +456,8 @@ function calculate() {
         operation = null;
         updateDisplay();
     } catch (error) {
-        currentInput = 'Error';
+        const isDetailed = (typeof settingsState === 'undefined' || settingsState.detailedErrors !== false);
+        currentInput = isDetailed ? getDetailedErrorMessage(error, fullExpr) : 'Error';
         expressionChain = '';
         previousInput = '';
         operation = null;
@@ -314,7 +479,7 @@ function clearEntry() {
 }
 
 function backspace() {
-    if (currentInput.length > 1) {
+    if (currentInput.length > 1 && !isErrorState(currentInput)) {
         currentInput = currentInput.slice(0, -1);
     } else {
         currentInput = '0';
@@ -323,14 +488,14 @@ function backspace() {
 }
 
 function toggleSign() {
-    if (currentInput !== '0' && currentInput !== 'Error') {
+    if (currentInput !== '0' && !isErrorState(currentInput)) {
         currentInput = (parseFloat(currentInput) * -1).toString();
         updateDisplay();
     }
 }
 
 function percentage() {
-    if (currentInput !== 'Error') {
+    if (!isErrorState(currentInput)) {
         currentInput = (parseFloat(currentInput) / 100).toString();
         updateDisplay();
     }
@@ -338,7 +503,7 @@ function percentage() {
 
 // Scientific functions
 function scientificFunction(func) {
-    if (currentInput === 'Error') return;
+    if (isErrorState(currentInput)) return;
     
     try {
         let value = parseFloat(currentInput);
@@ -355,20 +520,46 @@ function scientificFunction(func) {
                 result = angleMode === 'deg' ? Math.tan(value * Math.PI / 180) : Math.tan(value);
                 break;
             case 'asin':
+                if (value < -1 || value > 1) throw new Error('Domain Error: asin(x) requires -1 ≤ x ≤ 1');
                 result = angleMode === 'deg' ? Math.asin(value) * 180 / Math.PI : Math.asin(value);
                 break;
             case 'acos':
+                if (value < -1 || value > 1) throw new Error('Domain Error: acos(x) requires -1 ≤ x ≤ 1');
                 result = angleMode === 'deg' ? Math.acos(value) * 180 / Math.PI : Math.acos(value);
                 break;
             case 'atan':
                 result = angleMode === 'deg' ? Math.atan(value) * 180 / Math.PI : Math.atan(value);
                 break;
+            case 'sinh':
+                result = Math.sinh(value);
+                break;
+            case 'cosh':
+                result = Math.cosh(value);
+                break;
+            case 'tanh':
+                result = Math.tanh(value);
+                break;
             case 'log':
+                if (value <= 0) throw new Error('Domain Error: Non-positive argument for log10 (requires x > 0)');
                 result = Math.log10(value);
                 break;
+            case 'log2':
+                if (value <= 0) throw new Error('Domain Error: Non-positive argument for log2 (requires x > 0)');
+                result = Math.log2(value);
+                break;
             case 'ln':
+                if (value <= 0) throw new Error('Domain Error: Non-positive argument for ln (requires x > 0)');
                 result = Math.log(value);
                 break;
+            case 'toFraction': {
+                result = decimalToFraction(currentInput);
+                addToHistory(`frac(${currentInput})`, result);
+                currentInput = result.toString();
+                previousInput = '';
+                operation = null;
+                updateDisplay();
+                return;
+            }
             case 'exp':
                 result = Math.exp(value);
                 break;
@@ -382,6 +573,7 @@ function scientificFunction(func) {
                 result = value * value * value;
                 break;
             case 'sqrt':
+                if (value < 0) throw new Error('Domain Error: Negative square root (requires x ≥ 0)');
                 result = Math.sqrt(value);
                 break;
             case 'cbrt':
@@ -394,7 +586,7 @@ function scientificFunction(func) {
                 result = Math.abs(value);
                 break;
             case 'reciprocal':
-                if (value === 0) throw new Error('Division by zero');
+                if (value === 0) throw new Error('Math Error: Division by zero');
                 result = 1 / value;
                 break;
             default:
@@ -407,7 +599,8 @@ function scientificFunction(func) {
         operation = null;
         updateDisplay();
     } catch (error) {
-        currentInput = 'Error';
+        const isDetailed = (typeof settingsState === 'undefined' || settingsState.detailedErrors !== false);
+        currentInput = isDetailed ? (error.message.startsWith('Domain Error') || error.message.startsWith('Math Error') ? error.message : `Error: ${error.message}`) : 'Error';
         updateDisplay();
     }
 }
@@ -732,25 +925,9 @@ function clearHistory() {
         history = [];
         saveHistory();
         renderHistory();
-        // After clearing, show a prominent Back to Main button inside history
-        const historyList = document.getElementById('historyList');
-        historyList.innerHTML = '';
-        // Create a back-arrow button for a compact UI
-        const backBtn = document.createElement('button');
-        backBtn.className = 'back-arrow-btn';
-        backBtn.innerHTML = '<span class="back-arrow">\u2190</span> Back';
-        backBtn.setAttribute('aria-label', 'Back to Main');
-        backBtn.addEventListener('click', () => {
-            const historyPanel = document.getElementById('historyPanel');
-            if (historyPanel) historyPanel.classList.remove('active');
-            switchMode('basic');
-        });
-        historyList.appendChild(backBtn);
-        // Make sure history panel is visible so the button is accessible
-        const historyPanel = document.getElementById('historyPanel');
-        if (historyPanel) historyPanel.classList.add('active');
-        // Focus the button for accessibility
-        backBtn.focus();
+        if (typeof showNotification === 'function') {
+            showNotification('History cleared');
+        }
     }
 }
 
@@ -807,7 +984,8 @@ function exportHistory(format = 'json') {
 }
 
 function toggleHistory() {
-    document.getElementById('historyPanel').classList.toggle('active');
+    closeHamburgerMenu();
+    document.getElementById('historyPanel')?.classList.toggle('active');
 }
 
 // Notification
@@ -2122,24 +2300,60 @@ function initializeMatrixInputs() {
     updateMatrixInputs('B');
     updateSystemInputs();
     updateDetMatrixInputs();
+    if (!largeMatrixState.A.data) {
+        generateRandomLargeMatrix('A', 5, 5, -5, 5, true);
+        generateRandomLargeMatrix('B', 5, 5, -5, 5, true);
+    }
+}
+
+// Get matrix dimensions (rows and cols, clamped 1-25)
+function getMatrixDimensions(matrixName) {
+    const rowsEl = document.getElementById(`matrix${matrixName}Rows`);
+    const colsEl = document.getElementById(`matrix${matrixName}Cols`);
+    let rows = rowsEl ? parseInt(rowsEl.value) : 3;
+    let cols = colsEl ? parseInt(colsEl.value) : rows;
+    if (isNaN(rows) || rows < 1) rows = 1;
+    if (isNaN(cols) || cols < 1) cols = 1;
+    if (rows > 25) rows = 25;
+    if (cols > 25) cols = 25;
+    
+    // Update badge if present
+    const badge = document.getElementById(`badgeMatrix${matrixName}`);
+    if (badge) badge.textContent = `${rows}×${cols}`;
+    
+    return { rows, cols };
 }
 
 // Update matrix input grids
 function updateMatrixInputs(matrixName) {
-    const size = parseInt(document.getElementById(`matrix${matrixName}Rows`).value);
+    const { rows, cols } = getMatrixDimensions(matrixName);
     const grid = document.getElementById(`matrix${matrixName}Grid`);
+    if (!grid) return;
+    
+    // Preserve existing inputs
+    const existing = {};
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const el = document.getElementById(`${matrixName.toLowerCase()}${i}_${j}`) || 
+                       document.getElementById(`${matrixName.toLowerCase()}${i}${j}`);
+            if (el && el.value !== '') existing[`${i}_${j}`] = el.value;
+        }
+    }
     
     grid.innerHTML = '';
-    grid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+    grid.style.gridTemplateColumns = `repeat(${cols}, minmax(42px, 1fr))`;
     
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
             const input = document.createElement('input');
             input.type = 'number';
-            input.step = '0.1';
-            input.id = `${matrixName.toLowerCase()}${i}${j}`;
+            input.step = 'any';
+            input.id = `${matrixName.toLowerCase()}${i}_${j}`;
             input.placeholder = '0';
             input.className = 'matrix-cell';
+            if (existing[`${i}_${j}`] !== undefined) {
+                input.value = existing[`${i}_${j}`];
+            }
             grid.appendChild(input);
         }
     }
@@ -2202,20 +2416,126 @@ function updateDetMatrixInputs() {
     }
 }
 
-// Get matrix from inputs
+// Get matrix from inputs as 2D array
 function getMatrix(matrixName) {
-    const size = parseInt(document.getElementById(`matrix${matrixName}Rows`).value);
+    const { rows, cols } = getMatrixDimensions(matrixName);
     const matrix = [];
     
-    for (let i = 0; i < size; i++) {
+    for (let i = 0; i < rows; i++) {
         matrix[i] = [];
-        for (let j = 0; j < size; j++) {
-            const value = parseFloat(document.getElementById(`${matrixName.toLowerCase()}${i}${j}`).value) || 0;
+        for (let j = 0; j < cols; j++) {
+            const el = document.getElementById(`${matrixName.toLowerCase()}${i}_${j}`) || 
+                       document.getElementById(`${matrixName.toLowerCase()}${i}${j}`);
+            const value = el ? (parseFloat(el.value) || 0) : 0;
             matrix[i][j] = value;
         }
     }
     
     return matrix;
+}
+
+// Matrix Operations Dropdown Handlers
+function handleMatrixOpDropdownChange() {
+    const sel = document.getElementById('matrixOperationSelect');
+    if (!sel) return;
+    const val = sel.value;
+    const scalarGroup = document.getElementById('scalarInputGroup');
+    const powerGroup = document.getElementById('powerInputGroup');
+    
+    if (scalarGroup) {
+        scalarGroup.style.display = (val === 'scalarA' || val === 'scalarB') ? 'block' : 'none';
+    }
+    if (powerGroup) {
+        powerGroup.style.display = (val === 'powerA' || val === 'powerB') ? 'block' : 'none';
+    }
+}
+
+function executeSelectedMatrixOperation() {
+    const sel = document.getElementById('matrixOperationSelect');
+    if (!sel) return;
+    const op = sel.value;
+    
+    switch (op) {
+        case 'multiply':
+            multiplyMatrices();
+            break;
+        case 'add':
+            addMatrices();
+            break;
+        case 'subtract':
+            subtractMatrices();
+            break;
+        case 'kronecker':
+            calculateKroneckerProduct();
+            break;
+        case 'transposeA':
+            calculateTranspose('A');
+            break;
+        case 'determinantA':
+            calculateDeterminant('A');
+            break;
+        case 'inverseA':
+            calculateInverse('A');
+            break;
+        case 'traceA':
+            calculateTrace('A');
+            break;
+        case 'rankA':
+            calculateRank('A');
+            break;
+        case 'powerA': {
+            const p = parseInt(document.getElementById('matrixPowerVal')?.value) || 2;
+            calculateMatrixPower('A', p);
+            break;
+        }
+        case 'normA':
+            calculateMatrixNorms('A');
+            break;
+        case 'eigenvaluesA':
+            calculateEigenvalues('A');
+            break;
+        case 'eigenvectorsA':
+            calculateEigenvectors('A');
+            break;
+        case 'eigensystemA':
+            calculateEigenSystem('A');
+            break;
+        case 'scalarA': {
+            const s = parseFloat(document.getElementById('scalarValue')?.value) || 2;
+            calculateScalarMultiply('A', s);
+            break;
+        }
+        case 'transposeB':
+            calculateTranspose('B');
+            break;
+        case 'determinantB':
+            calculateDeterminant('B');
+            break;
+        case 'inverseB':
+            calculateInverse('B');
+            break;
+        case 'traceB':
+            calculateTrace('B');
+            break;
+        case 'rankB':
+            calculateRank('B');
+            break;
+        case 'powerB': {
+            const p = parseInt(document.getElementById('matrixPowerVal')?.value) || 2;
+            calculateMatrixPower('B', p);
+            break;
+        }
+        case 'normB':
+            calculateMatrixNorms('B');
+            break;
+        case 'scalarB': {
+            const s = parseFloat(document.getElementById('scalarValue')?.value) || 2;
+            calculateScalarMultiply('B', s);
+            break;
+        }
+        default:
+            multiplyMatrices();
+    }
 }
 
 // Get determinant matrix from inputs
@@ -2299,7 +2619,7 @@ function determinant(matrix) {
     const n = matrix.length;
     
     if (n !== matrix[0].length) {
-        throw new Error('Matrix must be square');
+        throw new Error(`Square Matrix Required: Determinant is only defined for square (N×N) matrices, but received a ${n}×${matrix[0].length} matrix.`);
     }
     
     if (n === 1) return matrix[0][0];
@@ -2469,7 +2789,7 @@ function calculateTrace(matrixName) {
 function trace(matrix) {
     const n = matrix.length;
     if (n !== matrix[0].length) {
-        throw new Error('Matrix must be square');
+        throw new Error(`Square Matrix Required: Trace is the sum of main diagonal elements and is only defined for square (N×N) matrices, but received a ${n}×${matrix[0].length} matrix.`);
     }
     
     let sum = 0;
@@ -2689,19 +3009,19 @@ function addMatrices() {
         
         resultDiv.innerHTML = `
             <strong>Matrix Addition: A + B</strong><br><br>
-            <div style="display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 1rem; align-items: center;">
-                <div>
-                    <strong>Matrix A:</strong><br>
+            <div class="matrix-equation-view">
+                <div class="matrix-equation-item">
+                    <strong>Matrix A:</strong>
                     ${formatMatrix(matrixA)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">+</div>
-                <div>
-                    <strong>Matrix B:</strong><br>
+                <div class="matrix-equation-op">+</div>
+                <div class="matrix-equation-item">
+                    <strong>Matrix B:</strong>
                     ${formatMatrix(matrixB)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">=</div>
-                <div>
-                    <strong>Result:</strong><br>
+                <div class="matrix-equation-op">=</div>
+                <div class="matrix-equation-item">
+                    <strong>Result:</strong>
                     ${formatMatrix(result)}
                 </div>
             </div>
@@ -2715,7 +3035,7 @@ function addMatrices() {
 
 function matrixAdd(matrixA, matrixB) {
     if (matrixA.length !== matrixB.length || matrixA[0].length !== matrixB[0].length) {
-        throw new Error('Matrices must have the same dimensions');
+        throw new Error(`Dimension Mismatch: Cannot add Matrix A (${matrixA.length}×${matrixA[0].length}) and Matrix B (${matrixB.length}×${matrixB[0].length}). Both matrices must have identical dimensions.`);
     }
     
     const result = createMatrix(matrixA.length, matrixA[0].length);
@@ -2740,19 +3060,19 @@ function subtractMatrices() {
         
         resultDiv.innerHTML = `
             <strong>Matrix Subtraction: A - B</strong><br><br>
-            <div style="display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 1rem; align-items: center;">
-                <div>
-                    <strong>Matrix A:</strong><br>
+            <div class="matrix-equation-view">
+                <div class="matrix-equation-item">
+                    <strong>Matrix A:</strong>
                     ${formatMatrix(matrixA)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">−</div>
-                <div>
-                    <strong>Matrix B:</strong><br>
+                <div class="matrix-equation-op">−</div>
+                <div class="matrix-equation-item">
+                    <strong>Matrix B:</strong>
                     ${formatMatrix(matrixB)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">=</div>
-                <div>
-                    <strong>Result:</strong><br>
+                <div class="matrix-equation-op">=</div>
+                <div class="matrix-equation-item">
+                    <strong>Result:</strong>
                     ${formatMatrix(result)}
                 </div>
             </div>
@@ -2766,7 +3086,7 @@ function subtractMatrices() {
 
 function matrixSubtract(matrixA, matrixB) {
     if (matrixA.length !== matrixB.length || matrixA[0].length !== matrixB[0].length) {
-        throw new Error('Matrices must have the same dimensions');
+        throw new Error(`Dimension Mismatch: Cannot subtract Matrix B (${matrixB.length}×${matrixB[0].length}) from Matrix A (${matrixA.length}×${matrixA[0].length}). Both matrices must have identical dimensions.`);
     }
     
     const result = createMatrix(matrixA.length, matrixA[0].length);
@@ -2791,19 +3111,19 @@ function multiplyMatrices() {
         
         resultDiv.innerHTML = `
             <strong>Matrix Multiplication: A × B</strong><br><br>
-            <div style="display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 1rem; align-items: center;">
-                <div>
-                    <strong>Matrix A:</strong><br>
+            <div class="matrix-equation-view">
+                <div class="matrix-equation-item">
+                    <strong>Matrix A:</strong>
                     ${formatMatrix(matrixA)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">×</div>
-                <div>
-                    <strong>Matrix B:</strong><br>
+                <div class="matrix-equation-op">×</div>
+                <div class="matrix-equation-item">
+                    <strong>Matrix B:</strong>
                     ${formatMatrix(matrixB)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">=</div>
-                <div>
-                    <strong>Result:</strong><br>
+                <div class="matrix-equation-op">=</div>
+                <div class="matrix-equation-item">
+                    <strong>Result:</strong>
                     ${formatMatrix(result)}
                 </div>
             </div>
@@ -2817,7 +3137,7 @@ function multiplyMatrices() {
 
 function matrixMultiply(matrixA, matrixB) {
     if (matrixA[0].length !== matrixB.length) {
-        throw new Error('Number of columns in A must equal number of rows in B');
+        throw new Error(`Dimension Mismatch: Cannot multiply Matrix A (${matrixA.length}×${matrixA[0].length}) by Matrix B (${matrixB.length}×${matrixB[0].length}). Matrix A columns (${matrixA[0].length}) must equal Matrix B rows (${matrixB.length}).`);
     }
     
     const result = createMatrix(matrixA.length, matrixB[0].length);
@@ -2846,16 +3166,16 @@ function scalarMultiply() {
         
         resultDiv.innerHTML = `
             <strong>Scalar Multiplication: ${scalar} × A</strong><br><br>
-            <div style="display: grid; grid-template-columns: auto auto 1fr auto 1fr; gap: 1rem; align-items: center;">
-                <div style="font-size: 1.5rem; text-align: center;">${scalar}</div>
-                <div style="font-size: 1.5rem; text-align: center;">×</div>
-                <div>
-                    <strong>Matrix A:</strong><br>
+            <div class="matrix-equation-view">
+                <div class="matrix-equation-op" style="font-size: 1.8rem;">${scalar}</div>
+                <div class="matrix-equation-op">×</div>
+                <div class="matrix-equation-item">
+                    <strong>Matrix A:</strong>
                     ${formatMatrix(matrixA)}
                 </div>
-                <div style="font-size: 1.5rem; text-align: center;">=</div>
-                <div>
-                    <strong>Result:</strong><br>
+                <div class="matrix-equation-op">=</div>
+                <div class="matrix-equation-item">
+                    <strong>Result:</strong>
                     ${formatMatrix(result)}
                 </div>
             </div>
@@ -3128,41 +3448,195 @@ function solveByLU(coeffMatrix, constants) {
 
 // Matrix utility functions for filling matrices
 function fillRandomMatrix(matrixName) {
-    const size = parseInt(document.getElementById(`matrix${matrixName}Rows`).value);
+    const { rows, cols } = getMatrixDimensions(matrixName);
     
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
-            const value = Math.floor(Math.random() * 20) - 10; // Random integers from -10 to 9
-            document.getElementById(`${matrixName.toLowerCase()}${i}${j}`).value = value;
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const value = Math.floor(Math.random() * 20) - 10;
+            const el = document.getElementById(`${matrixName.toLowerCase()}${i}_${j}`) || 
+                       document.getElementById(`${matrixName.toLowerCase()}${i}${j}`);
+            if (el) el.value = value;
         }
     }
     
-    showNotification(`Matrix ${matrixName} filled with random values`);
+    if (typeof showNotification === 'function') {
+        showNotification(`Matrix ${matrixName} (${rows}×${cols}) filled with random values`);
+    }
 }
 
 function fillIdentityMatrix(matrixName) {
-    const size = parseInt(document.getElementById(`matrix${matrixName}Rows`).value);
+    const { rows, cols } = getMatrixDimensions(matrixName);
     
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
             const value = i === j ? 1 : 0;
-            document.getElementById(`${matrixName.toLowerCase()}${i}${j}`).value = value;
+            const el = document.getElementById(`${matrixName.toLowerCase()}${i}_${j}`) || 
+                       document.getElementById(`${matrixName.toLowerCase()}${i}${j}`);
+            if (el) el.value = value;
         }
     }
     
-    showNotification(`Matrix ${matrixName} set to identity matrix`);
+    if (typeof showNotification === 'function') {
+        showNotification(`Matrix ${matrixName} set to identity (${rows}×${cols})`);
+    }
 }
 
 function clearMatrix(matrixName) {
-    const size = parseInt(document.getElementById(`matrix${matrixName}Rows`).value);
+    const { rows, cols } = getMatrixDimensions(matrixName);
     
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
-            document.getElementById(`${matrixName.toLowerCase()}${i}${j}`).value = '';
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const el = document.getElementById(`${matrixName.toLowerCase()}${i}_${j}`) || 
+                       document.getElementById(`${matrixName.toLowerCase()}${i}${j}`);
+            if (el) el.value = '';
         }
     }
     
-    showNotification(`Matrix ${matrixName} cleared`);
+    if (typeof showNotification === 'function') {
+        showNotification(`Matrix ${matrixName} cleared`);
+    }
+}
+
+// Matrix Power: A^k
+function calculateMatrixPower(matrixName, power = 2) {
+    const matrix = getMatrix(matrixName);
+    const resultDiv = document.getElementById('matrixResult');
+    if (!resultDiv) return;
+    
+    if (matrix.length !== matrix[0].length) {
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Square Matrix Required: Matrix power Aᵏ is only defined for square (N×N) matrices, but Matrix ${matrixName} has dimensions ${matrix.length}×${matrix[0].length}.</span>`;
+        return;
+    }
+    
+    const n = matrix.length;
+    let res = createMatrix(n, n);
+    for (let i = 0; i < n; i++) res[i][i] = 1; // Identity
+    
+    for (let p = 0; p < power; p++) {
+        res = matrixMultiply(res, matrix);
+    }
+    
+    resultDiv.innerHTML = `
+        <strong>Matrix Power: ${matrixName}<sup>${power}</sup></strong><br><br>
+        <div class="matrix-equation-view">
+            <div class="matrix-equation-item">
+                <strong>Matrix ${matrixName}:</strong>
+                ${formatMatrix(matrix)}
+            </div>
+            <div class="matrix-equation-op">→</div>
+            <div class="matrix-equation-item">
+                <strong>Result (${matrixName}<sup>${power}</sup>):</strong>
+                ${formatMatrix(res)}
+            </div>
+        </div>
+    `;
+    addToHistory(`${matrixName}^${power}`, 'calculated');
+}
+
+// Matrix Norms: Frobenius, L1, L-Infinity
+function calculateMatrixNorms(matrixName) {
+    const matrix = getMatrix(matrixName);
+    const resultDiv = document.getElementById('matrixResult');
+    if (!resultDiv) return;
+    
+    const rows = matrix.length;
+    const cols = matrix[0].length;
+    
+    // Frobenius Norm: sqrt(sum(a_ij^2))
+    let sumSq = 0;
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            sumSq += matrix[i][j] * matrix[i][j];
+        }
+    }
+    const frobNorm = Math.sqrt(sumSq);
+    
+    // L1 Norm: Maximum absolute column sum
+    let maxColSum = 0;
+    for (let j = 0; j < cols; j++) {
+        let colSum = 0;
+        for (let i = 0; i < rows; i++) {
+            colSum += Math.abs(matrix[i][j]);
+        }
+        if (colSum > maxColSum) maxColSum = colSum;
+    }
+    
+    // L-Infinity Norm: Maximum absolute row sum
+    let maxRowSum = 0;
+    for (let i = 0; i < rows; i++) {
+        let rowSum = 0;
+        for (let j = 0; j < cols; j++) {
+            rowSum += Math.abs(matrix[i][j]);
+        }
+        if (rowSum > maxRowSum) maxRowSum = rowSum;
+    }
+    
+    resultDiv.innerHTML = `
+        <strong>Matrix Norms for Matrix ${matrixName} (${rows}×${cols}):</strong><br><br>
+        ${formatMatrix(matrix)}<br>
+        <ul style="margin-top: 10px; line-height: 1.8;">
+            <li><strong>Frobenius Norm (||A||<sub>F</sub>):</strong> ${frobNorm.toFixed(6)}</li>
+            <li><strong>1-Norm / Maximum Column Sum (||A||<sub>1</sub>):</strong> ${maxColSum.toFixed(6)}</li>
+            <li><strong>Infinity Norm / Maximum Row Sum (||A||<sub>∞</sub>):</strong> ${maxRowSum.toFixed(6)}</li>
+        </ul>
+    `;
+    addToHistory(`||${matrixName}||`, frobNorm.toFixed(4));
+}
+
+// Kronecker Product A (x) B
+function calculateKroneckerProduct() {
+    const A = getMatrix('A');
+    const B = getMatrix('B');
+    const resultDiv = document.getElementById('matrixResult');
+    if (!resultDiv) return;
+    
+    const rA = A.length, cA = A[0].length;
+    const rB = B.length, cB = B[0].length;
+    const rC = rA * rB, cC = cA * cB;
+    
+    if (rC > 20 || cC > 20) {
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Matrix Size Error: Kronecker product result would be ${rC}×${cC} (> 20×20). Please use smaller input dimensions.</span>`;
+        return;
+    }
+    
+    const C = createMatrix(rC, cC);
+    for (let i = 0; i < rA; i++) {
+        for (let j = 0; j < cA; j++) {
+            for (let k = 0; k < rB; k++) {
+                for (let l = 0; l < cB; l++) {
+                    C[i * rB + k][j * cB + l] = A[i][j] * B[k][l];
+                }
+            }
+        }
+    }
+    
+    resultDiv.innerHTML = `
+        <strong>Kronecker Product (A ⊗ B): Result ${rC}×${cC}</strong><br><br>
+        ${formatMatrix(C)}
+    `;
+    addToHistory('A ⊗ B', 'calculated');
+}
+
+// Scalar multiply helper
+function calculateScalarMultiply(matrixName, scalar = 2) {
+    const matrix = getMatrix(matrixName);
+    const resultDiv = document.getElementById('matrixResult');
+    if (!resultDiv) return;
+    
+    const rows = matrix.length;
+    const cols = matrix[0].length;
+    const res = createMatrix(rows, cols);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            res[i][j] = matrix[i][j] * scalar;
+        }
+    }
+    
+    resultDiv.innerHTML = `
+        <strong>Scalar Multiplication: ${scalar} × Matrix ${matrixName}</strong><br><br>
+        ${formatMatrix(res)}
+    `;
+    addToHistory(`${scalar} × ${matrixName}`, 'calculated');
 }
 
 // Load matrix examples
@@ -3754,6 +4228,447 @@ function solveCustomDeterminant(matrix, paramSymbol) {
         }
     `;
 }
+
+// ==========================================================================
+// ARBITRARY & LARGE MATRIX ENGINE (Up to 100x100)
+// ==========================================================================
+
+var largeMatrixState = {
+    A: { rows: 5, cols: 5, data: null },
+    B: { rows: 5, cols: 5, data: null },
+    result: { rows: 0, cols: 0, data: null, name: 'Result' },
+    activeView: 'result',
+    pageRow: 0,
+    pageCol: 0,
+    pageSize: 10
+};
+
+function createZeroMatrix(rows, cols) {
+    const mat = new Array(rows);
+    for (let i = 0; i < rows; i++) {
+        mat[i] = new Float64Array(cols);
+    }
+    return mat;
+}
+
+function generateRandomLargeMatrix(targetName, r, c, min = -10, max = 10, isInt = true, sparsity = 0) {
+    const rows = Math.min(100, Math.max(1, parseInt(r) || 5));
+    const cols = Math.min(100, Math.max(1, parseInt(c) || 5));
+    const mat = createZeroMatrix(rows, cols);
+    
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            if (sparsity > 0 && Math.random() < sparsity) {
+                mat[i][j] = 0;
+            } else {
+                let val = min + Math.random() * (max - min);
+                mat[i][j] = isInt ? Math.round(val) : parseFloat(val.toFixed(2));
+            }
+        }
+    }
+    
+    largeMatrixState[targetName] = { rows, cols, data: mat };
+    largeMatrixState.activeView = targetName;
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    if (typeof showNotification === 'function') {
+        showNotification(`Generated Matrix ${targetName} (${rows}×${cols})`);
+    }
+    return mat;
+}
+
+function setLargeIdentity(targetName, n) {
+    const size = Math.min(100, Math.max(1, parseInt(n) || 5));
+    const mat = createZeroMatrix(size, size);
+    for (let i = 0; i < size; i++) {
+        mat[i][i] = 1;
+    }
+    largeMatrixState[targetName] = { rows: size, cols: size, data: mat };
+    largeMatrixState.activeView = targetName;
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    if (typeof showNotification === 'function') {
+        showNotification(`Created Identity Matrix ${targetName} (${size}×${size})`);
+    }
+    return mat;
+}
+
+function parseCustomLargeMatrix(targetName, rawText) {
+    if (!rawText || !rawText.trim()) return null;
+    const lines = rawText.trim().split(/\r?\n/).filter(line => line.trim().length > 0);
+    const parsed = [];
+    let maxCols = 0;
+    for (let line of lines) {
+        const row = line.trim().split(/[\s,;]+/).filter(x => x.length > 0).map(Number);
+        if (row.some(isNaN)) {
+            if (typeof showNotification === 'function') showNotification('Error parsing numbers in custom matrix');
+            return null;
+        }
+        maxCols = Math.max(maxCols, row.length);
+        parsed.push(row);
+    }
+    const rows = Math.min(100, parsed.length);
+    const cols = Math.min(100, maxCols);
+    const mat = createZeroMatrix(rows, cols);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            mat[i][j] = parsed[i][j] !== undefined ? parsed[i][j] : 0;
+        }
+    }
+    largeMatrixState[targetName] = { rows, cols, data: mat };
+    largeMatrixState.activeView = targetName;
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    if (typeof showNotification === 'function') {
+        showNotification(`Loaded Custom Matrix ${targetName} (${rows}×${cols})`);
+    }
+    return mat;
+}
+
+function multiplyLargeMatricesOp() {
+    const A = largeMatrixState.A;
+    const B = largeMatrixState.B;
+    if (!A.data || !B.data) {
+        if (typeof showNotification === 'function') showNotification('Please generate or input Matrix A and Matrix B first');
+        return null;
+    }
+    if (A.cols !== B.rows) {
+        const msg = `Multiplication error: A columns (${A.cols}) must equal B rows (${B.rows})`;
+        if (typeof showNotification === 'function') showNotification(msg);
+        return null;
+    }
+    
+    const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const rA = A.rows;
+    const cA = A.cols;
+    const cB = B.cols;
+    const C = createZeroMatrix(rA, cB);
+    
+    for (let i = 0; i < rA; i++) {
+        const rowA = A.data[i];
+        const rowC = C[i];
+        for (let k = 0; k < cA; k++) {
+            const aik = rowA[k];
+            if (aik === 0) continue;
+            const rowB = B.data[k];
+            for (let j = 0; j < cB; j++) {
+                rowC[j] += aik * rowB[j];
+            }
+        }
+    }
+    const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const dt = (t1 - t0).toFixed(2);
+    
+    largeMatrixState.result = {
+        rows: rA,
+        cols: cB,
+        data: C,
+        name: `A × B (${rA}×${cB})`,
+        timeMs: dt
+    };
+    largeMatrixState.activeView = 'result';
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    if (typeof showNotification === 'function') {
+        showNotification(`Multiplied A × B (${rA}×${cB}) in ${dt}ms`);
+    }
+    return C;
+}
+
+function addLargeMatricesOp() {
+    const A = largeMatrixState.A;
+    const B = largeMatrixState.B;
+    if (!A.data || !B.data) {
+        if (typeof showNotification === 'function') showNotification('Please generate or input Matrix A and Matrix B first');
+        return null;
+    }
+    if (A.rows !== B.rows || A.cols !== B.cols) {
+        const msg = `Addition error: Dimensions must match (${A.rows}×${A.cols} vs ${B.rows}×${B.cols})`;
+        if (typeof showNotification === 'function') showNotification(msg);
+        return null;
+    }
+    const rows = A.rows;
+    const cols = A.cols;
+    const C = createZeroMatrix(rows, cols);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            C[i][j] = A.data[i][j] + B.data[i][j];
+        }
+    }
+    largeMatrixState.result = {
+        rows, cols, data: C,
+        name: `A + B (${rows}×${cols})`
+    };
+    largeMatrixState.activeView = 'result';
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    return C;
+}
+
+function subtractLargeMatricesOp() {
+    const A = largeMatrixState.A;
+    const B = largeMatrixState.B;
+    if (!A.data || !B.data) {
+        if (typeof showNotification === 'function') showNotification('Please generate or input Matrix A and Matrix B first');
+        return null;
+    }
+    if (A.rows !== B.rows || A.cols !== B.cols) {
+        const msg = `Subtraction error: Dimensions must match (${A.rows}×${A.cols} vs ${B.rows}×${B.cols})`;
+        if (typeof showNotification === 'function') showNotification(msg);
+        return null;
+    }
+    const rows = A.rows;
+    const cols = A.cols;
+    const C = createZeroMatrix(rows, cols);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            C[i][j] = A.data[i][j] - B.data[i][j];
+        }
+    }
+    largeMatrixState.result = {
+        rows, cols, data: C,
+        name: `A - B (${rows}×${cols})`
+    };
+    largeMatrixState.activeView = 'result';
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    return C;
+}
+
+function transposeLargeMatrixOp(targetName) {
+    const src = largeMatrixState[targetName];
+    if (!src || !src.data) {
+        if (typeof showNotification === 'function') showNotification(`Matrix ${targetName} is empty`);
+        return null;
+    }
+    const rows = src.rows;
+    const cols = src.cols;
+    const C = createZeroMatrix(cols, rows);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            C[j][i] = src.data[i][j];
+        }
+    }
+    largeMatrixState.result = {
+        rows: cols,
+        cols: rows,
+        data: C,
+        name: `${targetName}ᵀ (${cols}×${rows})`
+    };
+    largeMatrixState.activeView = 'result';
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    return C;
+}
+
+function scalarMultiplyLargeOp(targetName, scalar) {
+    const src = largeMatrixState[targetName];
+    if (!src || !src.data) {
+        if (typeof showNotification === 'function') showNotification(`Matrix ${targetName} is empty`);
+        return null;
+    }
+    const s = parseFloat(scalar);
+    if (isNaN(s)) return null;
+    const rows = src.rows;
+    const cols = src.cols;
+    const C = createZeroMatrix(rows, cols);
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            C[i][j] = src.data[i][j] * s;
+        }
+    }
+    largeMatrixState.result = {
+        rows, cols, data: C,
+        name: `${s} × ${targetName} (${rows}×${cols})`
+    };
+    largeMatrixState.activeView = 'result';
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+    return C;
+}
+
+function computeLargeMatrixStats(mat, rows, cols) {
+    if (!mat) return null;
+    let sumSq = 0;
+    let trace = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    let zeros = 0;
+    const isSquare = rows === cols;
+    
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const v = mat[i][j];
+            sumSq += v * v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+            if (v === 0) zeros++;
+            if (isSquare && i === j) trace += v;
+        }
+    }
+    const norm = Math.sqrt(sumSq);
+    const total = rows * cols;
+    const sparsity = total > 0 ? ((zeros / total) * 100).toFixed(1) : 0;
+    return {
+        rows, cols,
+        isSquare,
+        trace: isSquare ? trace.toFixed(4) : 'N/A',
+        norm: norm.toFixed(4),
+        min: min === Infinity ? 0 : min,
+        max: max === -Infinity ? 0 : max,
+        sparsity: `${sparsity}%`
+    };
+}
+
+function renderLargeMatrixViewer() {
+    const container = document.getElementById('largeMatrixViewer');
+    if (!container) return;
+    
+    const active = largeMatrixState.activeView;
+    const obj = largeMatrixState[active];
+    if (!obj || !obj.data) {
+        container.innerHTML = '<p class="no-result">No matrix data generated yet. Click Generate or Identity to begin.</p>';
+        return;
+    }
+    
+    const { rows, cols, data, name, timeMs } = obj;
+    const stats = computeLargeMatrixStats(data, rows, cols);
+    
+    const pageSize = largeMatrixState.pageSize || 10;
+    const pageRow = largeMatrixState.pageRow || 0;
+    const pageCol = largeMatrixState.pageCol || 0;
+    
+    const endRow = Math.min(rows, pageRow + pageSize);
+    const endCol = Math.min(cols, pageCol + pageSize);
+    
+    let html = `
+        <div class="matrix-stats-pills">
+            <span class="matrix-stat-pill">Viewing: <strong>${name || active}</strong></span>
+            <span class="matrix-stat-pill">Dimensions: <strong>${rows} × ${cols}</strong></span>
+            <span class="matrix-stat-pill">Trace: <strong>${stats.trace}</strong></span>
+            <span class="matrix-stat-pill">Frobenius Norm: <strong>${stats.norm}</strong></span>
+            <span class="matrix-stat-pill">Range: <strong>[${stats.min}, ${stats.max}]</strong></span>
+            <span class="matrix-stat-pill">Sparsity: <strong>${stats.sparsity}</strong></span>
+            ${timeMs ? `<span class="matrix-stat-pill">Time: <strong>${timeMs}ms</strong></span>` : ''}
+        </div>
+        
+        <div class="matrix-pagination-bar">
+            <div>
+                Showing Rows ${pageRow + 1}-${endRow} of ${rows}, Cols ${pageCol + 1}-${endCol} of ${cols}
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <button class="btn btn-sm btn-matrix-action" onclick="changeLargeMatrixPage('row', -10)" ${pageRow === 0 ? 'disabled' : ''}>▲ Rows -10</button>
+                <button class="btn btn-sm btn-matrix-action" onclick="changeLargeMatrixPage('row', 10)" ${endRow >= rows ? 'disabled' : ''}>▼ Rows +10</button>
+                <button class="btn btn-sm btn-matrix-action" onclick="changeLargeMatrixPage('col', -10)" ${pageCol === 0 ? 'disabled' : ''}>◀ Cols -10</button>
+                <button class="btn btn-sm btn-matrix-action" onclick="changeLargeMatrixPage('col', 10)" ${endCol >= cols ? 'disabled' : ''}>▶ Cols +10</button>
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <button class="btn btn-sm btn-matrix-action" onclick="copyLargeMatrixCSV('${active}')"><i class="fas fa-copy"></i> Copy CSV</button>
+                <button class="btn btn-sm btn-matrix-action" onclick="downloadLargeMatrixCSV('${active}')"><i class="fas fa-download"></i> Download CSV</button>
+            </div>
+        </div>
+        
+        <div class="matrix-viewer-wrapper">
+            <table class="matrix-virtual-table">
+                <thead>
+                    <tr>
+                        <th>R \\ C</th>
+    `;
+    
+    for (let j = pageCol; j < endCol; j++) {
+        html += `<th>C${j + 1}</th>`;
+    }
+    html += `</tr></thead><tbody>`;
+    
+    for (let i = pageRow; i < endRow; i++) {
+        html += `<tr><th>R${i + 1}</th>`;
+        for (let j = pageCol; j < endCol; j++) {
+            const val = data[i][j];
+            html += `<td>${Number.isInteger(val) ? val : val.toFixed(2)}</td>`;
+        }
+        html += `</tr>`;
+    }
+    
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+}
+
+function changeLargeMatrixPage(axis, delta) {
+    const active = largeMatrixState.activeView;
+    const obj = largeMatrixState[active];
+    if (!obj || !obj.data) return;
+    
+    if (axis === 'row') {
+        const next = largeMatrixState.pageRow + delta;
+        if (next >= 0 && next < obj.rows) {
+            largeMatrixState.pageRow = next;
+        }
+    } else if (axis === 'col') {
+        const next = largeMatrixState.pageCol + delta;
+        if (next >= 0 && next < obj.cols) {
+            largeMatrixState.pageCol = next;
+        }
+    }
+    renderLargeMatrixViewer();
+}
+
+function setLargeMatrixView(target) {
+    largeMatrixState.activeView = target;
+    largeMatrixState.pageRow = 0;
+    largeMatrixState.pageCol = 0;
+    renderLargeMatrixViewer();
+}
+
+function exportLargeMatrixCSVString(target) {
+    const obj = largeMatrixState[target];
+    if (!obj || !obj.data) return '';
+    const { rows, cols, data } = obj;
+    const lines = [];
+    for (let i = 0; i < rows; i++) {
+        const row = [];
+        for (let j = 0; j < cols; j++) {
+            row.push(data[i][j]);
+        }
+        lines.push(row.join(','));
+    }
+    return lines.join('\n');
+}
+
+function copyLargeMatrixCSV(target) {
+    const csv = exportLargeMatrixCSVString(target);
+    if (!csv) return;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(csv).then(() => {
+            if (typeof showNotification === 'function') showNotification('Matrix CSV copied to clipboard!');
+        });
+    } else {
+        if (typeof showNotification === 'function') showNotification('Clipboard access unavailable');
+    }
+}
+
+function downloadLargeMatrixCSV(target) {
+    const csv = exportLargeMatrixCSVString(target);
+    if (!csv) return;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `matrix_${target}_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (typeof showNotification === 'function') showNotification('Matrix CSV downloaded!');
+}
+
 // GPA Calculator Functions
 
 // Grade scales and their corresponding grade points with your exact specifications
@@ -3833,11 +4748,38 @@ function initializeGPACalculator() {
     updateInputMode();
 }
 
+// Add a course dynamically (no 7-course limitation)
+function addCourse() {
+    const numCoursesInput = document.getElementById('numCourses');
+    if (!numCoursesInput) return;
+    const current = Math.max(1, parseInt(numCoursesInput.value) || 1);
+    numCoursesInput.value = current + 1;
+    updateCourseInputs();
+    if (typeof showNotification === 'function') {
+        showNotification(`Added Course ${current + 1}`);
+    }
+}
+
+// Remove the last course dynamically
+function removeLastCourse() {
+    const numCoursesInput = document.getElementById('numCourses');
+    if (!numCoursesInput) return;
+    const current = parseInt(numCoursesInput.value) || 1;
+    if (current > 1) {
+        removeCourse(current);
+    } else {
+        if (typeof showNotification === 'function') {
+            showNotification('Cannot remove the last course');
+        }
+    }
+}
+
 // Update course input fields based on number of courses
 function updateCourseInputs() {
     const numCoursesInput = document.getElementById('numCourses');
     if (!numCoursesInput) return;
-    const numCourses = parseInt(numCoursesInput.value);
+    const numCourses = Math.max(1, parseInt(numCoursesInput.value) || 1);
+    numCoursesInput.value = numCourses;
     const container = document.getElementById('coursesContainer');
     if (!container) return;
     
@@ -7457,6 +8399,432 @@ function calculateGradient(fnExpr, point, variables = ['x', 'y']) {
     return variables.map(v => calculatePartialDerivative(fnExpr, point, v));
 }
 
+// --- Calculus: Limits & Series ---
+function calculateLimit() {
+    const input = document.getElementById('limitInput')?.value;
+    const pointStr = document.getElementById('limitPoint')?.value;
+    const direction = document.getElementById('limitDirection')?.value || 'both';
+    const resultDiv = document.getElementById('limitResult');
+    if (!resultDiv) return;
+
+    if (!input || !input.trim()) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter a function f(x)</span>';
+        return;
+    }
+    const c = parseFloat(pointStr !== '' && pointStr !== undefined ? pointStr : 0);
+    if (isNaN(c)) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter a valid approach point c</span>';
+        return;
+    }
+
+    try {
+        const varMatch = input.match(/[a-zA-Z]/);
+        const variable = varMatch ? varMatch[0] : 'x';
+
+        let compiledFn = null;
+        if (typeof math !== 'undefined' && typeof math.compile === 'function') {
+            try {
+                compiledFn = math.compile(input);
+            } catch (ce) {}
+        }
+
+        const evalF = (xVal) => {
+            if (compiledFn) {
+                return compiledFn.evaluate({ [variable]: xVal });
+            }
+            return evaluateFunction(input, xVal);
+        };
+
+        const steps = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7];
+        const leftVals = [];
+        const rightVals = [];
+
+        for (const h of steps) {
+            try {
+                const fl = evalF(c - h);
+                if (typeof fl === 'number' && isFinite(fl)) leftVals.push({ h, x: c - h, fx: fl });
+            } catch (e) {}
+            try {
+                const fr = evalF(c + h);
+                if (typeof fr === 'number' && isFinite(fr)) rightVals.push({ h, x: c + h, fx: fr });
+            } catch (e) {}
+        }
+
+        const leftLim = leftVals.length > 0 ? leftVals[leftVals.length - 1].fx : NaN;
+        const rightLim = rightVals.length > 0 ? rightVals[rightVals.length - 1].fx : NaN;
+
+        const roundLim = (val) => {
+            if (isNaN(val)) return 'Undefined';
+            if (Math.abs(val - Math.round(val)) < 1e-5) return Math.round(val).toString();
+            return Number(val).toFixed(6).replace(/\.?0+$/, '');
+        };
+
+        let resultHTML = `<strong>Function:</strong> f(${variable}) = ${escapeHTML(input)}, approaching c = ${c}<br><br>`;
+
+        if (direction === 'left') {
+            const limStr = roundLim(leftLim);
+            resultHTML += `<div class="highlight-result">lim (${variable} → ${c}⁻) = <strong>${limStr}</strong></div>`;
+        } else if (direction === 'right') {
+            const limStr = roundLim(rightLim);
+            resultHTML += `<div class="highlight-result">lim (${variable} → ${c}⁺) = <strong>${limStr}</strong></div>`;
+        } else {
+            // Both sided
+            const diff = Math.abs(leftLim - rightLim);
+            if (!isNaN(leftLim) && !isNaN(rightLim) && diff < 1e-3) {
+                const limVal = (leftLim + rightLim) / 2;
+                resultHTML += `<div class="highlight-result">lim (${variable} → ${c}) = <strong>${roundLim(limVal)}</strong></div>`;
+                resultHTML += `<small style="color: #94a3b8">Left-hand limit: ${roundLim(leftLim)}, Right-hand limit: ${roundLim(rightLim)} (Continuous / Convergent)</small>`;
+            } else {
+                resultHTML += `<div class="highlight-result" style="color: var(--danger)">Limit Does Not Exist (DNE)</div>`;
+                resultHTML += `<small style="color: #94a3b8">Left-hand limit (${variable} → ${c}⁻) = ${roundLim(leftLim)}<br>Right-hand limit (${variable} → ${c}⁺) = ${roundLim(rightLim)}</small>`;
+            }
+        }
+
+        resultDiv.innerHTML = resultHTML;
+        addToHistory(`lim_{${variable}→${c}} (${input})`, direction === 'both' ? roundLim(leftLim) : (direction === 'left' ? roundLim(leftLim) : roundLim(rightLim)));
+    } catch (err) {
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Error calculating limit: ${escapeHTML(err.message)}</span>`;
+    }
+}
+
+function calculateTaylorSeries() {
+    const input = document.getElementById('taylorInput')?.value;
+    const centerStr = document.getElementById('taylorCenter')?.value;
+    const orderStr = document.getElementById('taylorOrder')?.value;
+    const resultDiv = document.getElementById('taylorResult');
+    if (!resultDiv) return;
+
+    if (!input || !input.trim()) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter a function f(x)</span>';
+        return;
+    }
+
+    const c = parseFloat(centerStr !== '' && centerStr !== undefined ? centerStr : 0);
+    const order = Math.min(6, Math.max(1, parseInt(orderStr) || 4));
+
+    try {
+        const varMatch = input.match(/[a-zA-Z]/);
+        const variable = varMatch ? varMatch[0] : 'x';
+
+        let parsedExpr = null;
+        if (typeof math !== 'undefined' && typeof math.parse === 'function') {
+            try {
+                parsedExpr = math.parse(input);
+            } catch (pe) {}
+        }
+
+        const factorialNum = (k) => {
+            let res = 1;
+            for (let i = 2; i <= k; i++) res *= i;
+            return res;
+        };
+
+        const derivatives = [];
+        let currentExpr = parsedExpr;
+
+        for (let k = 0; k <= order; k++) {
+            if (k === 0) {
+                let f0 = NaN;
+                if (currentExpr) {
+                    try { f0 = currentExpr.evaluate({ [variable]: c }); } catch (e) {}
+                }
+                if (isNaN(f0)) f0 = evaluateFunction(input, c);
+                derivatives.push({ order: 0, dExpr: input, valAtC: f0, coeff: f0 });
+            } else {
+                let dExpr = null;
+                let valAtC = NaN;
+                if (currentExpr && typeof math !== 'undefined' && typeof math.derivative === 'function') {
+                    try {
+                        currentExpr = math.derivative(currentExpr, variable);
+                        dExpr = currentExpr.toString();
+                        valAtC = currentExpr.evaluate({ [variable]: c });
+                    } catch (e) {}
+                }
+                if (isNaN(valAtC)) {
+                    // Numerical derivative finite difference fallback
+                    const h = 1e-4;
+                    const f1 = evaluateFunction(input, c + h);
+                    const f0 = evaluateFunction(input, c);
+                    const fm1 = evaluateFunction(input, c - h);
+                    if (k === 1) valAtC = (f1 - fm1) / (2 * h);
+                    else if (k === 2) valAtC = (f1 - 2 * f0 + fm1) / (h * h);
+                    else valAtC = 0;
+                }
+                const fact = factorialNum(k);
+                derivatives.push({ order: k, dExpr: dExpr || `f^(${k})`, valAtC, coeff: valAtC / fact });
+            }
+        }
+
+        // Build polynomial string
+        let polyTerms = [];
+        for (let k = 0; k <= order; k++) {
+            const coeff = derivatives[k].coeff;
+            if (Math.abs(coeff) < 1e-9) continue;
+
+            const roundCoeff = (Math.abs(coeff - Math.round(coeff)) < 1e-6) ? Math.round(coeff) : Number(coeff.toFixed(4));
+            let termStr = '';
+
+            let powerStr = '';
+            if (k === 1) {
+                powerStr = (c === 0) ? variable : `(${variable} - ${c})`;
+            } else if (k > 1) {
+                powerStr = (c === 0) ? `${variable}^${k}` : `(${variable} - ${c})^${k}`;
+            }
+
+            if (k === 0) {
+                termStr = `${roundCoeff}`;
+            } else if (roundCoeff === 1) {
+                termStr = powerStr;
+            } else if (roundCoeff === -1) {
+                termStr = `-${powerStr}`;
+            } else {
+                termStr = `${roundCoeff}·${powerStr}`;
+            }
+
+            if (polyTerms.length > 0 && roundCoeff > 0) {
+                polyTerms.push(`+ ${termStr}`);
+            } else if (polyTerms.length > 0 && roundCoeff < 0) {
+                polyTerms.push(`- ${termStr.replace(/^-/, '')}`);
+            } else {
+                polyTerms.push(termStr);
+            }
+        }
+
+        const polynomialString = polyTerms.length > 0 ? polyTerms.join(' ') : '0';
+        const typeName = (c === 0) ? `Maclaurin Series (c = 0, Order ${order})` : `Taylor Series around c = ${c} (Order ${order})`;
+
+        let resultHTML = `<strong>${typeName} for f(${variable}) = ${escapeHTML(input)}:</strong><br><br>`;
+        resultHTML += `<div class="highlight-result" style="font-family: monospace; font-size: 1.1rem; line-height: 1.6;">`;
+        resultHTML += `P_${order}(${variable}) = ${escapeHTML(polynomialString)}`;
+        resultHTML += `</div><br>`;
+        resultHTML += `<strong>Derivatives at center c = ${c}:</strong><br><ul style="margin: 8px 0 0 20px; font-size: 0.9rem; color: #cbd5e1;">`;
+        for (const d of derivatives) {
+            const valStr = isNaN(d.valAtC) ? 'Undefined' : (Math.abs(d.valAtC - Math.round(d.valAtC)) < 1e-6 ? Math.round(d.valAtC) : Number(d.valAtC).toFixed(5));
+            resultHTML += `<li>f<sup>(${d.order})</sup>(${c}) = ${valStr} &nbsp;→&nbsp; a_${d.order} = ${valStr}/${factorialNum(d.order)} = ${Number(d.coeff).toFixed(5)}</li>`;
+        }
+        resultHTML += `</ul>`;
+
+        resultDiv.innerHTML = resultHTML;
+        addToHistory(`Taylor(${input}, c=${c}, n=${order})`, polynomialString);
+    } catch (err) {
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Error calculating Taylor series: ${escapeHTML(err.message)}</span>`;
+    }
+}
+
+// --- Combinatorics: Advanced Sequences & Partitions ---
+function updateAdvCombInputs() {
+    const type = document.getElementById('advCombType')?.value;
+    const rGroup = document.getElementById('advCombRGroup');
+    if (!rGroup) return;
+    if (type === 'repetition') {
+        rGroup.style.display = 'block';
+    } else {
+        rGroup.style.display = 'none';
+    }
+}
+
+function calculateAdvancedCombinatorics() {
+    const type = document.getElementById('advCombType')?.value || 'catalan';
+    const n = parseInt(document.getElementById('advCombN')?.value);
+    const r = parseInt(document.getElementById('advCombR')?.value);
+    const resultDiv = document.getElementById('advCombResult');
+    if (!resultDiv) return;
+
+    if (isNaN(n) || n < 0) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Invalid input: n must be a non-negative integer (n ≥ 0)</span>';
+        return;
+    }
+
+    try {
+        let resultTitle = '';
+        let formula = '';
+        let value = '';
+        let explanation = '';
+
+        if (type === 'catalan') {
+            if (n > 35) {
+                resultDiv.innerHTML = '<span style="color: var(--danger)">n is too large (max 35 for exact calculation)</span>';
+                return;
+            }
+            const bigFact = (num) => {
+                let res = 1n;
+                for (let i = 2n; i <= BigInt(num); i++) res *= i;
+                return res;
+            };
+            const bigCatalan = (num) => {
+                if (num === 0) return 1n;
+                const numerator = bigFact(2 * num);
+                const denominator = bigFact(num + 1) * bigFact(num);
+                return numerator / denominator;
+            };
+            const catVal = bigCatalan(n);
+            resultTitle = `Catalan Number C_${n}`;
+            formula = `Cₙ = (1 / (n+1)) · C(2n, n) = (2n)! / ((n+1)! · n!)`;
+            value = catVal.toString();
+            explanation = `C_${n} represents the number of Dyck paths of length 2n, valid expressions of ${n} pairs of parentheses, and full binary trees with ${n + 1} leaves.`;
+        } else if (type === 'derangements') {
+            if (n > 30) {
+                resultDiv.innerHTML = '<span style="color: var(--danger)">n is too large (max 30 for exact calculation)</span>';
+                return;
+            }
+            const subfactorial = (num) => {
+                if (num === 0) return 1n;
+                if (num === 1) return 0n;
+                let a = 1n, b = 0n;
+                for (let i = 2n; i <= BigInt(num); i++) {
+                    const c = (i - 1n) * (b + a);
+                    a = b;
+                    b = c;
+                }
+                return b;
+            };
+            const subVal = subfactorial(n);
+            resultTitle = `Subfactorial / Derangements !${n}`;
+            formula = `!n = n! · ∑_{k=0}^{n} (-1)^k / k! ≈ [n! / e]`;
+            value = subVal.toString();
+            explanation = `!${n} is the number of permutations of ${n} distinct items where no item appears in its original position (0 fixed points).`;
+        } else if (type === 'repetition') {
+            if (isNaN(r) || r < 0) {
+                resultDiv.innerHTML = '<span style="color: var(--danger)">Invalid input: r must be a non-negative integer (r ≥ 0)</span>';
+                return;
+            }
+            if (n === 0 && r > 0) {
+                resultDiv.innerHTML = '<span style="color: var(--danger)">Cannot choose items from an empty set (n = 0)</span>';
+                return;
+            }
+            const bigCombination = (N, K) => {
+                if (K < 0 || K > N) return 0n;
+                if (K === 0 || K === N) return 1n;
+                const k = Math.min(K, N - K);
+                let num = 1n;
+                let den = 1n;
+                for (let i = 1; i <= k; i++) {
+                    num *= BigInt(N - i + 1);
+                    den *= BigInt(i);
+                }
+                return num / den;
+            };
+            const crVal = (n === 0 && r === 0) ? 1n : bigCombination(n + r - 1, r);
+            resultTitle = `Combinations with Repetition CR(${n}, ${r})`;
+            formula = `CR(n, r) = C(n + r - 1, r) = (n + r - 1)! / (r! · (n - 1)!)`;
+            value = crVal.toString();
+            explanation = `CR(${n}, ${r}) represents the number of ways to choose ${r} items from ${n} categories where items can be repeated (stars and bars problem).`;
+        } else if (type === 'bell') {
+            if (n > 25) {
+                resultDiv.innerHTML = '<span style="color: var(--danger)">n is too large (max 25 for exact calculation)</span>';
+                return;
+            }
+            const bellNumber = (num) => {
+                if (num === 0) return 1n;
+                const bell = [ [1n] ];
+                for (let i = 1; i <= num; i++) {
+                    const row = [ bell[i - 1][i - 1] ];
+                    for (let j = 1; j <= i; j++) {
+                        row.push(row[j - 1] + bell[i - 1][j - 1]);
+                    }
+                    bell.push(row);
+                }
+                return bell[num][0];
+            };
+            const bVal = bellNumber(n);
+            resultTitle = `Bell Number B_${n}`;
+            formula = `B_{n+1} = ∑_{k=0}^{n} C(n, k) · B_k`;
+            value = bVal.toString();
+            explanation = `B_${n} is the number of ways to partition a set of ${n} labeled elements into non-empty subsets.`;
+        }
+
+        resultDiv.innerHTML = `
+            <strong>${escapeHTML(resultTitle)}:</strong><br><br>
+            <div class="highlight-result">
+                Result = <strong>${value}</strong>
+            </div>
+            <br>
+            <div style="font-size: 0.9rem; color: #94a3b8; line-height: 1.5;">
+                <strong>Formula:</strong> <code>${escapeHTML(formula)}</code><br><br>
+                ${escapeHTML(explanation)}
+            </div>
+        `;
+        addToHistory(`${resultTitle}`, value);
+    } catch (err) {
+        resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(err.message)}</span>`;
+    }
+}
+
+// --- Settings Management ---
+var settingsState = {
+    angleUnit: 'deg',
+    precision: 12,
+    notation: 'auto',
+    detailedErrors: true
+};
+
+function loadSettings() {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const saved = localStorage.getItem('calculatorSettings');
+            if (saved) {
+                settingsState = Object.assign(settingsState, JSON.parse(saved));
+            }
+        }
+    } catch (e) {}
+}
+
+function saveSettings() {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('calculatorSettings', JSON.stringify(settingsState));
+        }
+    } catch (e) {}
+}
+
+function openSettings() {
+    closeHamburgerMenu();
+    const backdrop = document.getElementById('settingsModalBackdrop');
+    if (!backdrop) return;
+    
+    const angleEl = document.getElementById('settingAngleUnit');
+    if (angleEl) angleEl.value = settingsState.angleUnit;
+    const precEl = document.getElementById('settingPrecision');
+    if (precEl) precEl.value = settingsState.precision.toString();
+    const notEl = document.getElementById('settingNotation');
+    if (notEl) notEl.value = settingsState.notation;
+    const errEl = document.getElementById('settingDetailedErrors');
+    if (errEl) errEl.value = settingsState.detailedErrors.toString();
+
+    backdrop.classList.add('active');
+}
+
+function closeSettings() {
+    const backdrop = document.getElementById('settingsModalBackdrop');
+    if (backdrop) backdrop.classList.remove('active');
+}
+
+function updateSetting(key, val) {
+    settingsState[key] = val;
+    if (key === 'angleUnit') {
+        angleMode = val;
+        const btn = document.getElementById('angleMode');
+        if (btn) btn.textContent = val.toUpperCase();
+    }
+    saveSettings();
+}
+
+function resetCalculatorSettings() {
+    settingsState = {
+        angleUnit: 'deg',
+        precision: 12,
+        notation: 'auto',
+        detailedErrors: true
+    };
+    saveSettings();
+    openSettings();
+    if (typeof showNotification === 'function') {
+        showNotification('Settings reset to default');
+    }
+}
+
+loadSettings();
+
 // Export helper functions and modules to window / global
 window.testGraphFunctionality = testGraphFunctionality;
 window.manualGraphTest = manualGraphTest;
@@ -7474,5 +8842,20 @@ window.Complex = Complex;
 window.VectorOps = VectorOps;
 window.calculatePartialDerivative = calculatePartialDerivative;
 window.calculateGradient = calculateGradient;
+
+// Export Step 8 features
+window.calculateLimit = calculateLimit;
+window.calculateTaylorSeries = calculateTaylorSeries;
+window.updateAdvCombInputs = updateAdvCombInputs;
+window.calculateAdvancedCombinatorics = calculateAdvancedCombinatorics;
+window.decimalToFraction = decimalToFraction;
+window.getDetailedErrorMessage = getDetailedErrorMessage;
+window.settingsState = settingsState;
+window.openSettings = openSettings;
+window.closeSettings = closeSettings;
+window.updateSetting = updateSetting;
+window.resetCalculatorSettings = resetCalculatorSettings;
+window.openHamburgerMenu = openHamburgerMenu;
+window.closeHamburgerMenu = closeHamburgerMenu;
 
 console.log('Calculator JavaScript loaded successfully');
