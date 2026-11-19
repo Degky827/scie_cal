@@ -1,58 +1,127 @@
 // Service Worker for Advanced Scientific Calculator
-const CACHE_NAME = 'sci-calc-v1.0.0';
-const urlsToCache = [
+const CACHE_NAME = 'sci-calc-v1.1.0';
+
+// Core local assets required for the app shell
+const CORE_ASSETS = [
   './',
   './index.html',
   './calculate.htm',
   './calculate.js',
   './calculate.css',
   './manifest.json',
+  './favicon.ico',
   './icon-16.png',
   './icon-32.png',
   './icon-192.png',
   './icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  './screenshot-wide.png',
+  './screenshot-narrow.png'
 ];
 
-// Install event - cache resources
+// External CDN dependencies (math.js, Font Awesome CSS and webfonts)
+const EXTERNAL_ASSETS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2'
+];
+
+// Install event - resilient caching
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then(async cache => {
+      console.log('[SW] Caching local core app shell...');
+      // 1. Cache local core assets
+      await cache.addAll(CORE_ASSETS);
+      
+      // 2. Cache external CDN assets gracefully without failing install on network issues
+      await Promise.allSettled(
+        EXTERNAL_ASSETS.map(url =>
+          fetch(url, { mode: 'cors' })
+            .then(res => {
+              if (res.ok || res.type === 'opaque') {
+                return cache.put(url, res);
+              }
+            })
+            .catch(err => {
+              console.warn('[SW] Could not pre-cache external asset:', url, err.message);
+            })
+        )
+      );
+      
+      console.log('[SW] Install completed successfully');
+      return self.skipWaiting();
+    })
   );
 });
 
-// Fetch event - serve from cache when offline
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      }
-    )
-  );
-});
-
-// Activate event - clean up old caches
+// Activate event - clean up old caches and claim clients
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
+            console.log('[SW] Deleting obsolete cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Fetch event - Cache-first with network fallback, runtime caching & navigation fallback
+self.addEventListener('fetch', event => {
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
+
+  const requestUrl = new URL(event.request.url);
+
+  event.respondWith(
+    caches.match(event.request).then(cachedResponse => {
+      if (cachedResponse) {
+        // Return cached hit, but revalidate in background if online (stale-while-revalidate for local assets)
+        if (navigator.onLine && (requestUrl.origin === location.origin || EXTERNAL_ASSETS.includes(event.request.url))) {
+          fetch(event.request)
+            .then(networkResponse => {
+              if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+                caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse));
+              }
+            })
+            .catch(() => {/* Ignore network revalidation errors */});
+        }
+        return cachedResponse;
+      }
+
+      // Not in cache: fetch from network and cache dynamically (runtime caching)
+      return fetch(event.request)
+        .then(networkResponse => {
+          if (!networkResponse || (networkResponse.status !== 200 && networkResponse.type !== 'opaque')) {
+            return networkResponse;
+          }
+
+          // Cache runtime response for future offline use
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+
+          return networkResponse;
+        })
+        .catch(() => {
+          // Offline navigation fallback
+          if (event.request.mode === 'navigate') {
+            return caches.match('./calculate.htm').then(fallback => {
+              return fallback || caches.match('./index.html');
+            });
+          }
+          return new Response('Offline - resource unavailable', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: new Headers({ 'Content-Type': 'text/plain' })
+          });
+        });
     })
   );
 });
@@ -60,14 +129,9 @@ self.addEventListener('activate', event => {
 // Background sync for calculations (optional)
 self.addEventListener('sync', event => {
   if (event.tag === 'background-calculation') {
-    event.waitUntil(doBackgroundCalculation());
+    event.waitUntil(Promise.resolve());
   }
 });
-
-function doBackgroundCalculation() {
-  // Handle any background calculations if needed
-  return Promise.resolve();
-}
 
 // Push notifications (optional)
 self.addEventListener('push', event => {

@@ -133,24 +133,30 @@ This document outlines all identified bugs, design flaws, mathematical constrain
 
 ---
 
-## Step 5: PWA, Offline Caching & Asset Issues
+## Step 5: PWA, Offline Caching & Asset Issues ✅ (Resolved)
 
-These are problems with service worker caching, missing assets, and deployment configuration.
+> [!NOTE]
+> All PWA lifecycle, service worker caching, missing assets, and offline issues have been resolved across [`sw.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/sw.js), [`manifest.json`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/manifest.json), and [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js).
 
-1. **Brittle Offline Caching Strategy**
-   - **File & Location:** [`sw.js` (Lines 14–26)](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/sw.js#L14-L26)
-   - `urlsToCache` includes remote CDN URLs (`cdnjs.cloudflare.com/...`). If network connectivity drops or the CDN is blocked during the initial install, `cache.addAll()` fails entirely and the service worker is aborted.
-   - Font Awesome webfont binary files (`.woff2`) are not cached, causing icons to render as blank boxes when offline.
+1. **Brittle Offline Caching Strategy — Fixed**
+   - **File & Location:** [`sw.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/sw.js)
+   - **Resolution:** Upgraded the Service Worker caching architecture:
+     - Separated `CORE_ASSETS` (local app shell) from `EXTERNAL_ASSETS` (CDN libraries and fonts).
+     - External CDN resources (`math.min.js`, Font Awesome `all.min.css`, and `.woff2` webfont binaries `fa-solid-900.woff2`, `fa-regular-400.woff2`) are cached with `Promise.allSettled`, preventing CDN connection drops or timeouts from aborting the service worker install.
+     - Added runtime caching in the `fetch` handler: dynamic resources are cloned and saved to cache upon first fetch.
+     - Implemented offline navigation fallback: requests for any page URL (or with query parameters like `?mode=grapher`) return the cached `calculate.htm` when offline.
 
-2. **Missing Manifest Assets**
-   - **File & Location:** [`manifest.json` (Lines 40–52)](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/manifest.json#L40-L52)
-   - `screenshot-wide.png` and `screenshot-narrow.png` are referenced in the manifest, but neither file exists in the repository.
+2. **Missing Manifest Assets — Fixed**
+   - **File & Location:** [`manifest.json`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/manifest.json), [`screenshot-wide.png`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/screenshot-wide.png), and [`screenshot-narrow.png`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/screenshot-narrow.png)
+   - **Resolution:** Generated valid PNG images for `screenshot-wide.png` ($1280 \times 720$) and `screenshot-narrow.png` ($750 \times 1334$) matching the manifest specifications and PWA theme. All 4 icon sizes and both screenshots exist on disk and pass PWA audits.
 
-3. **Meta-Refresh Start URL Redirection**
-   - The PWA `start_url` points to `./` (`index.html`), which executes a `<meta http-equiv="refresh" content="0; URL=./calculate.htm">` client-side redirect. This can cause installation warnings or screen flashing on PWA launchers.
+3. **Meta-Refresh Start URL Redirection — Fixed**
+   - **File & Location:** [`manifest.json`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/manifest.json)
+   - **Resolution:** Updated `"start_url"` directly to `"./calculate.htm"`, eliminating the client-side meta-refresh redirect from `index.html` and enabling direct startup on PWA home screen launches.
 
-4. **Unsynchronized Local Storage**
-   - Calculation history is stored exclusively in browser `localStorage` up to a maximum of 50 items. There is no export option (JSON/CSV), import facility, or cloud synchronization.
+4. **Calculation History Export & Backup — Fixed**
+   - **File & Location:** [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js)
+   - **Resolution:** Implemented `exportHistory(format)` supporting both JSON and CSV downloads. Users can backup, export, and inspect their calculation history rather than having data locked in browser `localStorage`. Included safe error handling for private/incognito browsing environments.
 
 ---
 

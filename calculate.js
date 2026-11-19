@@ -732,10 +732,50 @@ function saveHistory() {
 }
 
 function loadHistory() {
-    const saved = localStorage.getItem('calculatorHistory');
-    if (saved) {
-        history = JSON.parse(saved);
-        renderHistory();
+    try {
+        const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem('calculatorHistory') : null;
+        if (saved) {
+            history = JSON.parse(saved);
+            renderHistory();
+        }
+    } catch (e) {
+        console.warn('Could not load history:', e);
+    }
+}
+
+// Export calculation history as JSON or CSV
+function exportHistory(format = 'json') {
+    if (!history || history.length === 0) {
+        showNotification('No history to export');
+        return;
+    }
+    
+    let content, mimeType, filename;
+    if (format === 'csv') {
+        const headers = 'Timestamp,Expression,Result\n';
+        const rows = history.map(h => `"${h.timestamp || ''}","${String(h.expression).replace(/"/g, '""')}","${String(h.result).replace(/"/g, '""')}"`).join('\n');
+        content = headers + rows;
+        mimeType = 'text/csv;charset=utf-8;';
+        filename = `calculator-history-${Date.now()}.csv`;
+    } else {
+        content = JSON.stringify(history, null, 2);
+        mimeType = 'application/json;charset=utf-8;';
+        filename = `calculator-history-${Date.now()}.json`;
+    }
+    
+    try {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showNotification(`History exported as ${format.toUpperCase()}`);
+    } catch (e) {
+        showNotification('Export failed: ' + e.message);
     }
 }
 
