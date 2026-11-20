@@ -90,6 +90,22 @@
                 <div class="memory-indicator" id="memoryIndicator">M: <span id="memoryValue">0</span></div>
             </div>
 
+            <!-- Step-by-Step Solution Card (Collapsible) -->
+            <div class="solution-steps-card" id="solutionStepsCard" style="display: none;">
+                <div class="solution-steps-header" onclick="toggleSolutionStepsCard()">
+                    <div class="solution-steps-title">
+                        <i class="fas fa-list-ol"></i> Solution Steps
+                        <span class="steps-count-badge" id="stepsCountBadge">0 steps</span>
+                    </div>
+                    <button class="btn-toggle-steps-icon" id="btnToggleStepsIcon" aria-label="Toggle Steps">
+                        <i class="fas fa-chevron-down" id="stepsToggleChevron"></i>
+                    </button>
+                </div>
+                <div class="solution-steps-body" id="solutionStepsBody">
+                    <p class="steps-empty">Perform a calculation to view the step-by-step solution breakdown.</p>
+                </div>
+            </div>
+
             <!-- Basic Mode Buttons -->
             <div class="buttons-grid" id="basicMode">
                 <button class="btn btn-function" onclick="clearAll()">AC</button>
@@ -253,25 +269,40 @@
                 <div class="calculus-section sub-tab-content" id="calcDerivative">
                     <h3><i class="fas fa-function"></i> Derivative (d/dx)</h3>
                     <div class="calculus-input">
-                        <input type="text" id="derivativeInput" placeholder="Enter function (e.g., x^2 + 3*x)">
-                        <input type="number" id="derivativePoint" placeholder="Point (optional)">
+                        <div class="calc-input-group">
+                            <label for="derivativeInput" class="calc-input-label">Function f(x):</label>
+                            <input type="text" id="derivativeInput" placeholder="Enter function (e.g., x^2 + 3*x, sin(x)*e^x)" autocomplete="off">
+                        </div>
+                        <div class="calc-input-group">
+                            <label for="derivativePoint" class="calc-input-label">Evaluation Point x (optional):</label>
+                            <input type="number" id="derivativePoint" placeholder="e.g., 2 (leave blank for general derivative)" step="any">
+                        </div>
                         <button class="btn btn-calculus" onclick="calculateDerivative()">
-                            <i class="fas fa-chart-line"></i> Calculate
+                            <i class="fas fa-chart-line"></i> Calculate Derivative
                         </button>
                     </div>
                     <div class="calculus-result" id="derivativeResult"></div>
                 </div>
 
                 <div class="calculus-section sub-tab-content hidden" id="calcIntegral">
-                    <h3><i class="fas fa-integral"></i> Integration (∫)</h3>
+                    <h3><i class="fas fa-calculator"></i> Definite Integration (∫)</h3>
                     <div class="calculus-input">
-                        <input type="text" id="integralInput" placeholder="Enter function (e.g., x^2)">
+                        <div class="calc-input-group">
+                            <label for="integralInput" class="calc-input-label">Integrand Function f(x):</label>
+                            <input type="text" id="integralInput" placeholder="Enter function (e.g., x^2, sin(x), 3*x^3 - 2*x)" autocomplete="off">
+                        </div>
                         <div class="integral-bounds">
-                            <input type="number" id="integralLower" placeholder="Lower bound">
-                            <input type="number" id="integralUpper" placeholder="Upper bound">
+                            <div class="calc-input-group">
+                                <label for="integralLower" class="calc-input-label">Lower Bound (a):</label>
+                                <input type="number" id="integralLower" placeholder="e.g., 0" step="any">
+                            </div>
+                            <div class="calc-input-group">
+                                <label for="integralUpper" class="calc-input-label">Upper Bound (b):</label>
+                                <input type="number" id="integralUpper" placeholder="e.g., 2" step="any">
+                            </div>
                         </div>
                         <button class="btn btn-calculus" onclick="calculateIntegral()">
-                            <i class="fas fa-calculator"></i> Calculate
+                            <i class="fas fa-calculator"></i> Calculate Integral
                         </button>
                     </div>
                     <div class="calculus-result" id="integralResult"></div>
@@ -280,9 +311,12 @@
                 <div class="calculus-section sub-tab-content hidden" id="calcEquation">
                     <h3><i class="fas fa-square-root-alt"></i> Equation Solver</h3>
                     <div class="calculus-input">
-                        <input type="text" id="equationInput" placeholder="Enter equation (e.g., x^2 - 4 = 0)">
+                        <div class="calc-input-group">
+                            <label for="equationInput" class="calc-input-label">Equation f(x) = 0:</label>
+                            <input type="text" id="equationInput" placeholder="Enter equation (e.g., x^2 - 4 = 0, sin(x) = 0.5)" autocomplete="off">
+                        </div>
                         <button class="btn btn-calculus" onclick="solveEquation()">
-                            <i class="fas fa-equals"></i> Solve
+                            <i class="fas fa-equals"></i> Solve Equation
                         </button>
                     </div>
                     <div class="calculus-result" id="equationResult"></div>
@@ -291,13 +325,24 @@
                 <div class="calculus-section sub-tab-content hidden" id="calcLimit">
                     <h3><i class="fas fa-arrows-alt-h"></i> Limit Calculator (lim x→c)</h3>
                     <div class="calculus-input">
-                        <input type="text" id="limitInput" placeholder="Enter function (e.g., sin(x)/x, (x^2 - 1)/(x - 1))">
-                        <input type="number" id="limitPoint" placeholder="Approaching c" value="0" step="any">
-                        <select id="limitDirection" style="padding: 8px; border-radius: 6px; background: #1e293b; color: #fff;">
-                            <option value="both">Two-Sided (x → c)</option>
-                            <option value="left">Left-Hand (x → c⁻)</option>
-                            <option value="right">Right-Hand (x → c⁺)</option>
-                        </select>
+                        <div class="calc-input-group">
+                            <label for="limitInput" class="calc-input-label">Function f(x):</label>
+                            <input type="text" id="limitInput" placeholder="Enter function (e.g., sin(x)/x, (x^2 - 1)/(x - 1))" autocomplete="off">
+                        </div>
+                        <div class="integral-bounds">
+                            <div class="calc-input-group">
+                                <label for="limitPoint" class="calc-input-label">Approaching Point (c):</label>
+                                <input type="number" id="limitPoint" placeholder="Approaching c" value="0" step="any">
+                            </div>
+                            <div class="calc-input-group">
+                                <label for="limitDirection" class="calc-input-label">Direction:</label>
+                                <select id="limitDirection">
+                                    <option value="both">Two-Sided (x → c)</option>
+                                    <option value="left">Left-Hand (x → c⁻)</option>
+                                    <option value="right">Right-Hand (x → c⁺)</option>
+                                </select>
+                            </div>
+                        </div>
                         <button class="btn btn-calculus" onclick="calculateLimit()">
                             <i class="fas fa-calculator"></i> Calculate Limit
                         </button>
@@ -308,9 +353,20 @@
                 <div class="calculus-section sub-tab-content hidden" id="calcTaylor">
                     <h3><i class="fas fa-superscript"></i> Taylor & Maclaurin Series</h3>
                     <div class="calculus-input">
-                        <input type="text" id="taylorInput" placeholder="Enter function (e.g., sin(x), e^x, cos(x))">
-                        <input type="number" id="taylorCenter" placeholder="Center c (0 for Maclaurin)" value="0" step="any">
-                        <input type="number" id="taylorOrder" placeholder="Order n (1-6)" value="4" min="1" max="6">
+                        <div class="calc-input-group">
+                            <label for="taylorInput" class="calc-input-label">Function f(x):</label>
+                            <input type="text" id="taylorInput" placeholder="Enter function (e.g., sin(x), e^x, cos(x))" autocomplete="off">
+                        </div>
+                        <div class="integral-bounds">
+                            <div class="calc-input-group">
+                                <label for="taylorCenter" class="calc-input-label">Center Point (c):</label>
+                                <input type="number" id="taylorCenter" placeholder="Center c (0 for Maclaurin)" value="0" step="any">
+                            </div>
+                            <div class="calc-input-group">
+                                <label for="taylorOrder" class="calc-input-label">Polynomial Order (n):</label>
+                                <input type="number" id="taylorOrder" placeholder="Order n (1-6)" value="4" min="1" max="6">
+                            </div>
+                        </div>
                         <button class="btn btn-calculus" onclick="calculateTaylorSeries()">
                             <i class="fas fa-calculator"></i> Generate Series
                         </button>
@@ -1763,7 +1819,7 @@
     </div>
 
     <!-- PWA Install Widget (Glossy Neon Green Pill matching user specification) -->
-    <div class="pwa-install-container" id="pwaInstallContainer">
+    <div class="pwa-install-container pwa-hidden" id="pwaInstallContainer" style="display: none;">
         <!-- Dismiss Button -->
         <button class="btn-dismiss-install" onclick="dismissInstallPrompt()" title="Dismiss" aria-label="Dismiss Install Prompt">&times;</button>
 
@@ -1893,11 +1949,59 @@
         // PWA Install Prompt State & Handlers
         let deferredPrompt;
 
+        function isPWAInstalled() {
+            return (
+                window.matchMedia('(display-mode: standalone)').matches ||
+                window.matchMedia('(display-mode: fullscreen)').matches ||
+                window.matchMedia('(display-mode: minimal-ui)').matches ||
+                window.navigator.standalone === true ||
+                (typeof document !== 'undefined' && document.referrer && document.referrer.includes('android-app://')) ||
+                localStorage.getItem('pwa_installed') === 'true'
+            );
+        }
+
+        function hideInstallButtons() {
+            const container = document.getElementById('pwaInstallContainer');
+            if (container) {
+                container.classList.add('pwa-hidden');
+                container.style.display = 'none';
+            }
+            const menuInstall = document.getElementById('menuInstallBtn');
+            if (menuInstall) {
+                menuInstall.style.display = 'none';
+            }
+        }
+
+        function checkInstallVisibility() {
+            if (isPWAInstalled()) {
+                hideInstallButtons();
+                return false;
+            }
+            if (localStorage.getItem('pwa_dismissed') === 'true') {
+                hideInstallButtons();
+                return false;
+            }
+            const container = document.getElementById('pwaInstallContainer');
+            if (container) {
+                container.classList.remove('pwa-hidden');
+                container.style.display = '';
+            }
+            return true;
+        }
+
+        // Initialize install button visibility check
+        checkInstallVisibility();
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            const container = document.getElementById('pwaInstallContainer');
-            if (container) container.classList.remove('pwa-hidden');
+            if (!isPWAInstalled() && localStorage.getItem('pwa_dismissed') !== 'true') {
+                const container = document.getElementById('pwaInstallContainer');
+                if (container) {
+                    container.classList.remove('pwa-hidden');
+                    container.style.display = '';
+                }
+            }
         });
 
         async function triggerPwaInstall() {
@@ -1905,29 +2009,50 @@
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
                 console.log(`User response to install: ${outcome}`);
+                if (outcome === 'accepted') {
+                    localStorage.setItem('pwa_installed', 'true');
+                    hideInstallButtons();
+                } else {
+                    dismissInstallPrompt(false);
+                }
                 deferredPrompt = null;
-                dismissInstallPrompt();
             } else {
                 showNotification('To install: click the Install icon (⊕) in your browser address bar or Menu ⋮ → "Install App"');
             }
         }
 
-        function dismissInstallPrompt() {
+        function dismissInstallPrompt(isInstalled = false) {
             const container = document.getElementById('pwaInstallContainer');
             if (container) {
                 container.style.opacity = '0';
                 container.style.transform = 'translateY(16px)';
                 setTimeout(() => {
+                    container.classList.add('pwa-hidden');
                     container.style.display = 'none';
                 }, 300);
+            }
+            if (isInstalled) {
+                localStorage.setItem('pwa_installed', 'true');
+            } else {
+                localStorage.setItem('pwa_dismissed', 'true');
             }
         }
 
         window.addEventListener('appinstalled', () => {
             console.log('PWA was installed');
-            dismissInstallPrompt();
+            localStorage.setItem('pwa_installed', 'true');
+            hideInstallButtons();
             showNotification('Scientific Calculator installed successfully!');
         });
+
+        try {
+            window.matchMedia('(display-mode: standalone)').addEventListener('change', (e) => {
+                if (e.matches) {
+                    localStorage.setItem('pwa_installed', 'true');
+                    hideInstallButtons();
+                }
+            });
+        } catch (err) {}
 
         // Handle URL parameters for shortcuts
         window.addEventListener('load', () => {

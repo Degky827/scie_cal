@@ -396,3 +396,81 @@ This document outlines all identified bugs, design flaws, mathematical constrain
    - **Resolution:**
      - Styled `.advanced-basic-grid` to match the 5-column layout of `.advanced-grid` for consistent geometric alignment.
      - Extended mobile responsive breakpoints (992px, 768px, 480px, 360px, landscape) to scale button padding, gap, and touch targets appropriately on all mobile devices and compact viewports.
+
+---
+
+## Step 12: Permanent PWA Install Suppression, Step-by-Step Solution Breakdown & Mobile Integration ✅ (Resolved)
+
+> [!NOTE]
+> All items in Step 12 have been implemented and verified with 134 automated unit tests in [`test/run_tests.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/test/run_tests.js) passing with 0 failures.
+
+1. **Permanent PWA Install Button Suppression — Fixed**
+   - **Files & Location:** [`calculate.htm`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.htm), [`calculate.css`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.css)
+   - **Problem:** The PWA install prompt button previously reappeared every time the application was opened, even if the user had already installed the application or launched it in standalone mode.
+   - **Resolution:**
+     - Set `#pwaInstallContainer` to `class="pwa-install-container pwa-hidden"` and `style="display: none;"` initially to prevent any visual flash during page load.
+     - Implemented `isPWAInstalled()` checking `window.matchMedia('(display-mode: standalone)').matches`, `navigator.standalone`, `document.referrer.includes('android-app://')`, and `localStorage.getItem('pwa_installed') === 'true'`.
+     - When an installation is accepted or detected, the app writes `localStorage.setItem('pwa_installed', 'true')` and calls `hideInstallButtons()`, suppressing both the floating widget and the menu button.
+     - Added real-time display-mode change listener `window.matchMedia('(display-mode: standalone)').addEventListener('change', ...)` to hide install triggers if standalone mode is entered dynamically.
+
+2. **Full Mobile Responsiveness in Integration Page — Fixed**
+   - **Files & Location:** [`calculate.htm`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.htm), [`calculate.css`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.css)
+   - **Problem:** On mobile screens, the integration sub-tab (`#calcIntegral`) overflowed horizontally because lower and upper bound inputs were constrained in a rigid grid, and wide integral result expressions broke the page viewport.
+   - **Resolution:**
+     - Refactored `#calcIntegral` form inputs into responsive `.calc-input-group` elements with semantic `.calc-input-label` headers.
+     - Added CSS rules for `.integral-bounds` utilizing `grid-template-columns: repeat(auto-fit, minmax(130px, 1fr))` with `min-width: 0` on child inputs to eliminate overflow.
+     - Added mobile media queries (`max-width: 480px` and `max-width: 360px`) converting bounds to a stacked column (`grid-template-columns: 1fr`).
+     - Added `overflow-wrap: anywhere`, `word-break: break-word`, and `overflow-x: auto` to `.calculus-result` so mathematical expressions wrap cleanly down to 320px viewport widths.
+
+3. **Step-by-Step Solution Breakdown Across All Operations — Fixed**
+   - **Files & Location:** [`calculate.htm`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.htm), [`calculate.js`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.js), [`calculate.css`](file:///c:/Users/abrha/OneDrive/Documents/GitHub/scientific-calculator/calculate.css)
+   - **Problem:** Calculations only displayed the final answer without explaining the mathematical steps taken to arrive at that result.
+   - **Resolution:**
+     - **Basic & Advanced Calculator:** Created collapsible `#solutionStepsCard` and step generation engine `generateArithmeticSteps(expression, result)` which traces PEMDAS / BODMAS operations in order:
+       1. Identify problem statement and precedence hierarchy.
+       2. Evaluate named functions (`sin`, `cos`, `tan`, `sqrt`, `log`, `ln`).
+       3. Resolve parenthesized sub-expressions.
+       4. Evaluate exponents and powers (`^`).
+       5. Evaluate multiplications, divisions, and modulo (`*`, `/`, `%`) left-to-right.
+       6. Evaluate additions and subtractions (`+`, `-`) left-to-right.
+       7. Output final simplified value.
+     - **History Integration:** Added `steps` persistence to history items; clicking "Solution Steps" on any history entry opens its step-by-step breakdown via `viewHistorySteps(index)`.
+     - **Calculus Operations:**
+       - **Definite Integration (`calculateIntegral`):** Details interval formulation, continuity checks, Simpson's 1/3 composite rule discretization ($n = 1000$ subintervals, $h = \frac{b-a}{n}$), composite parity sum, and final numerical value.
+       - **Derivatives (`calculateDerivative`):** Details independent variable detection, symbolic differentiation rules (Power, Product, Chain, Quotient), analytical derivative, and point evaluation.
+       - **Equation Solver (`solveEquation`):** Details transformation to standard form $f(x)=0$, Newton-Raphson multi-point iteration, convergence tolerance verification, and real root solutions.
+       - **Limits (`calculateLimit`):** Details analytical formulation, left-hand numerical approach ($x \to c^-$), right-hand approach ($x \to c^+$), and limit existence conclusion.
+       - **Taylor Series (`calculateTaylorSeries`):** Details series formulation, zero-th through n-th derivative coefficients, and assembled approximating polynomial.
+     - **Matrix Operations (`multiplyMatrices`):** Details dimension compatibility check ($r_A \times c_A$ with $r_B \times c_B$), inner dot-product formula $C_{ij} = \sum A_{ik} B_{kj}$, sample computation for $C_{1,1}$, and complete product matrix.
+     - **Combinatorics (`calculatePermutation`, `calculateCombination`):** Details formula definition, parameter substitution, factorial cancellation, and final count.
+     - **Polynomials (`displayPolynomialSolution`):** Details standard polynomial form, algebraic resolution method (linear, quadratic discriminant $\Delta = b^2 - 4ac$, companion matrix factorization), and fundamental theorem of algebra root multiplicity.
+
+---
+
+## Deployment Guide: Redeploying to GitHub Pages 🚀
+
+The project is hosted in the GitHub repository at `https://github.com/Degky827/scientific-calculator.git`.
+
+### How to Redeploy Updates:
+
+1. **Commit and Push Changes to `main`:**
+   ```bash
+   git add -A
+   git commit -m "feat: permanent install suppression, step-by-step solutions, and mobile integration"
+   git push origin main
+   ```
+
+2. **Automatic GitHub Pages Deployment:**
+   - Once pushed, GitHub automatically detects the new commits on branch `main`.
+   - If GitHub Pages is configured under **Repository Settings → Pages → Build and deployment (Deploy from a branch: `main` / `/ (root)`)**, GitHub Pages immediately rebuilds and redeploys the site within 1–2 minutes.
+   - The live site will be accessible at:
+     ```
+     https://degky827.github.io/scientific-calculator/
+     ```
+
+3. **Bypassing Browser / PWA Cache on Deployed Site:**
+   - Because the app uses a Service Worker for offline PWA support, browsers may cache assets.
+   - To see changes immediately on client devices:
+     - **On Desktop (Chrome, Edge, Firefox):** Press `Ctrl + F5` or `Ctrl + Shift + R` to hard reload.
+     - **On Mobile Browser / Installed PWA:** In Chrome Settings → App info / Site settings, click **Clear data** or close and reopen the PWA twice so the service worker updates in the background.
+

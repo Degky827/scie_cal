@@ -122,7 +122,31 @@ const mockDOM = {
     },
     style: {}
   },
-  toggleBasicKeypadText: { textContent: 'Basic Pad: ON', style: {} }
+  toggleBasicKeypadText: { textContent: 'Basic Pad: ON', style: {} },
+  solutionStepsCard: {
+    classes: new Set(),
+    classList: {
+      add(c) { mockDOM.solutionStepsCard.classes.add(c); },
+      remove(c) { mockDOM.solutionStepsCard.classes.delete(c); },
+      contains(c) { return mockDOM.solutionStepsCard.classes.has(c); }
+    },
+    style: { display: 'none' },
+    scrollIntoView: () => {}
+  },
+  solutionStepsBody: { innerHTML: '', style: { display: 'none' } },
+  stepsCountBadge: { textContent: '0 steps', style: {} },
+  stepsToggleChevron: { className: 'fas fa-chevron-down', style: {} },
+  btnToggleStepsIcon: { style: {} },
+  pwaInstallContainer: {
+    classes: new Set(['pwa-install-container', 'pwa-hidden']),
+    classList: {
+      add(c) { mockDOM.pwaInstallContainer.classes.add(c); },
+      remove(c) { mockDOM.pwaInstallContainer.classes.delete(c); },
+      contains(c) { return mockDOM.pwaInstallContainer.classes.has(c); }
+    },
+    style: { display: 'none' }
+  },
+  menuInstallBtn: { style: { display: 'none' } }
 };
 
 let capturedListeners = {};
@@ -146,6 +170,25 @@ global.localStorage = {
 
 global.window = global;
 global.window.devicePixelRatio = 2;
+
+// Mock math.js for unit testing
+global.math = {
+  parse: (expr) => ({
+    toString: () => expr,
+    filter: () => [{ isSymbolNode: true, name: 't' }],
+    evaluate: (scope) => 7
+  }),
+  derivative: (expr, variable) => ({
+    toString: () => `2*${variable} + 3`,
+    evaluate: (scope) => 2 * (scope[variable] || 0) + 3
+  }),
+  compile: (expr) => ({
+    evaluate: (scope) => {
+      const x = scope.x !== undefined ? scope.x : (scope.t !== undefined ? scope.t : 0);
+      return Math.pow(x, 2);
+    }
+  })
+};
 
 // Load and evaluate calculate.js
 const calculateJS = fs.readFileSync(path.join(__dirname, '../calculate.js'), 'utf8');
@@ -520,6 +563,60 @@ async function runAllTests() {
   toggleAdvancedBasicKeypad();
   assert(!mockDOM['advancedBasicSection'].classList.contains('hidden'), 'toggleAdvancedBasicKeypad reveals section when toggled twice');
   assert(mockDOM['toggleBasicKeypadText'].textContent === 'Basic Pad: ON', 'toggle text updates to Basic Pad: ON');
+
+  console.log('\n--- Step 12: Permanent PWA Install Suppression, Step-by-Step Breakdown & Mobile Integration ---');
+  // 1. PWA Install Suppression
+  assert(htmlContent.includes('isPWAInstalled'), 'HTML defines isPWAInstalled() detection logic');
+  assert(htmlContent.includes('hideInstallButtons'), 'HTML defines hideInstallButtons() suppression function');
+  assert(htmlContent.includes('checkInstallVisibility'), 'HTML checks install visibility on page load');
+  assert(htmlContent.includes('class="pwa-install-container pwa-hidden"'), 'PWA container is hidden by default with pwa-hidden');
+  assert(htmlContent.includes('display: none;'), 'PWA container has inline display: none to prevent flash on load');
+  assert(htmlContent.includes("localStorage.setItem('pwa_installed', 'true')"), 'PWA install accepted saves pwa_installed flag in localStorage');
+
+  // 2. Integration Page Mobile Responsiveness
+  assert(htmlContent.includes('calc-input-group') && htmlContent.includes('calc-input-label'), 'Integration form uses responsive .calc-input-group and labels');
+  assert(cssContent.includes('.integral-bounds') && cssContent.includes('grid-template-columns'), 'CSS defines responsive grid for .integral-bounds');
+  assert(cssContent.includes('@media (max-width: 480px)') && cssContent.includes('.integral-bounds'), 'CSS stacks integral bounds on mobile screens <= 480px');
+  assert(cssContent.includes('overflow-wrap: anywhere') || cssContent.includes('word-break: break-word'), 'Calculus results wrap long formulas on mobile screens');
+
+  // 3. Step-by-Step Solution Breakdown
+  assert(htmlContent.includes('id="solutionStepsCard"') && htmlContent.includes('id="solutionStepsBody"'), 'Step-by-step card elements present in calculate.htm');
+  assert(typeof generateArithmeticSteps === 'function', 'generateArithmeticSteps is defined as a function');
+  assert(typeof toggleSolutionStepsCard === 'function', 'toggleSolutionStepsCard is defined as a function');
+  assert(typeof renderSolutionSteps === 'function', 'renderSolutionSteps is defined as a function');
+
+  // Test arithmetic steps generation with PEMDAS
+  const pemdasSteps = generateArithmeticSteps('2 + 3 * 4', '14');
+  assert(pemdasSteps.length >= 3, 'generateArithmeticSteps produces >= 3 steps for 2 + 3 * 4');
+  assert(pemdasSteps.some(s => s.title.includes('Multiplication')), 'Steps trace multiplication before addition');
+  assert(pemdasSteps[pemdasSteps.length - 1].math.includes('14'), 'Final step reflects computed result');
+
+  // Test parentheses and powers
+  const parenSteps = generateArithmeticSteps('(5 + 3) * 2 ^ 3', '64');
+  assert(parenSteps.some(s => s.title.includes('Parentheses')), 'Steps trace parentheses resolution');
+  assert(parenSteps.some(s => s.title.includes('Exponentiation')), 'Steps trace exponentiation');
+
+  // Test calculate() integration
+  currentInput = '2 + 3 * 4';
+  expressionChain = '';
+  calculate();
+  assert(mockDOM['solutionStepsCard'].style.display === 'block', 'calculate() automatically displays #solutionStepsCard');
+  assert(mockDOM['solutionStepsBody'].innerHTML.includes('step-card'), 'calculate() renders step cards in #solutionStepsBody');
+  assert(mockDOM['stepsCountBadge'].textContent.includes('step'), 'calculate() updates steps count badge');
+
+  // Test clearAll() resets steps card
+  clearAll();
+  assert(mockDOM['solutionStepsCard'].style.display === 'none', 'clearAll() hides #solutionStepsCard');
+
+  // Test Calculus step-by-step solutions
+  calculateDerivative();
+  assert(mockDOM['derivativeResult'].innerHTML.includes('Solution Steps') && mockDOM['derivativeResult'].innerHTML.includes('step-card'), 'calculateDerivative outputs step-by-step breakdown');
+
+  calculateIntegral();
+  assert(mockDOM['integralResult'].innerHTML.includes('Solution Steps') && mockDOM['integralResult'].innerHTML.includes('Simpson') && mockDOM['integralResult'].innerHTML.includes('1/3 Rule'), 'calculateIntegral outputs Simpson\'s Rule step-by-step breakdown');
+
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('Solution Steps') && mockDOM['equationResult'].innerHTML.includes('Newton-Raphson'), 'solveEquation outputs Newton-Raphson step-by-step breakdown');
 
   console.log('\n====================================================');
   console.log(`  SUMMARY: ALL ${totalPassed} TESTS PASSED PERFECTLY! (0 Failed)`);

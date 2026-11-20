@@ -443,6 +443,245 @@ function evaluateArithmetic(val) {
     }
 }
 
+// Format a timeline of solution steps as HTML
+function formatStepsTimelineHTML(steps) {
+    if (!steps || !steps.length) return '';
+    const cards = steps.map((s, i) => `
+        <div class="step-card">
+            <div class="step-number">${i + 1}</div>
+            <div class="step-content">
+                <div class="step-heading">${escapeHTML(s.title || `Step ${i + 1}`)}</div>
+                ${s.math ? `<div class="step-math">${escapeHTML(s.math)}</div>` : ''}
+                ${s.explanation ? `<div class="step-explanation">${escapeHTML(s.explanation)}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+    
+    return `
+        <div class="calculus-steps-wrapper" style="margin-top: 1rem;">
+            <div class="solution-steps-header" style="border-radius: 8px 8px 0 0;">
+                <div class="solution-steps-title">
+                    <i class="fas fa-list-ol"></i> Solution Steps
+                    <span class="steps-count-badge">${steps.length} ${steps.length === 1 ? 'step' : 'steps'}</span>
+                </div>
+            </div>
+            <div class="solution-steps-body" style="background: rgba(15, 23, 42, 0.5); border-radius: 0 0 8px 8px; border: 1px solid rgba(255, 255, 255, 0.08); border-top: none;">
+                <div class="steps-timeline">
+                    ${cards}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Generate structured step-by-step solution breakdown for arithmetic expressions (PEMDAS)
+function generateArithmeticSteps(exprStr, finalResult) {
+    const steps = [];
+    let expr = String(exprStr).trim();
+    if (!expr) return steps;
+
+    steps.push({
+        title: 'Original Expression',
+        math: expr,
+        explanation: 'Review the mathematical expression and apply standard Order of Operations (PEMDAS: Parentheses / Functions, Exponents, Multiplication & Division, Addition & Subtraction).'
+    });
+
+    let current = expr;
+    let stepCount = 1;
+
+    // 1. Evaluate known single-argument functions: sqrt, cbrt, abs, sin, cos, tan, log, ln
+    let fnMatches = current.match(/([a-zA-Z]+)\(([^()]+)\)/);
+    while (fnMatches && stepCount < 10) {
+        const fnName = fnMatches[1].toLowerCase();
+        const argStr = fnMatches[2];
+        try {
+            let fnVal = NaN;
+            const argNum = parseFloat(argStr);
+            if (!isNaN(argNum)) {
+                if (fnName === 'sqrt') fnVal = Math.sqrt(argNum);
+                else if (fnName === 'cbrt') fnVal = Math.cbrt(argNum);
+                else if (fnName === 'abs') fnVal = Math.abs(argNum);
+                else if (fnName === 'sin') fnVal = (currentAngleMode === 'deg') ? Math.sin(argNum * Math.PI / 180) : Math.sin(argNum);
+                else if (fnName === 'cos') fnVal = (currentAngleMode === 'deg') ? Math.cos(argNum * Math.PI / 180) : Math.cos(argNum);
+                else if (fnName === 'tan') fnVal = (currentAngleMode === 'deg') ? Math.tan(argNum * Math.PI / 180) : Math.tan(argNum);
+                else if (fnName === 'log') fnVal = Math.log10(argNum);
+                else if (fnName === 'ln') fnVal = Math.log(argNum);
+            }
+            if (!isNaN(fnVal) && isFinite(fnVal)) {
+                stepCount++;
+                const formattedVal = Number(fnVal.toFixed(8)).toString();
+                current = current.replace(fnMatches[0], formattedVal);
+                steps.push({
+                    title: `Evaluate Function ${fnMatches[1]}()`,
+                    math: `${fnMatches[0]} = ${formattedVal}`,
+                    explanation: `Calculate function ${fnMatches[1]} with argument ${argStr} = ${formattedVal}. Expression simplifies to: ${current}`
+                });
+            } else {
+                break;
+            }
+        } catch (e) {
+            break;
+        }
+        fnMatches = current.match(/([a-zA-Z]+)\(([^()]+)\)/);
+    }
+
+    // 2. Evaluate expressions inside Parentheses
+    let parenMatches = current.match(/\(([^()]+)\)/);
+    while (parenMatches && stepCount < 16) {
+        const inner = parenMatches[1];
+        try {
+            const innerSanitized = inner.replace(/\^/g, '**');
+            const evalInner = new Function('return (' + innerSanitized + ');')();
+            if (typeof evalInner === 'number' && isFinite(evalInner)) {
+                stepCount++;
+                const formattedInner = Number(evalInner.toFixed(8)).toString();
+                current = current.replace('(' + inner + ')', formattedInner);
+                steps.push({
+                    title: 'Resolve Parentheses',
+                    math: `(${inner}) → ${formattedInner}`,
+                    explanation: `Evaluate the sub-expression within brackets: (${inner}) = ${formattedInner}. Expression reduces to: ${current}`
+                });
+            } else {
+                break;
+            }
+        } catch (e) {
+            break;
+        }
+        parenMatches = current.match(/\(([^()]+)\)/);
+    }
+
+    // 3. Evaluate Exponents / Powers (^)
+    let powerMatches = current.match(/(-?\d+(?:\.\d+)?)\s*\^\s*(-?\d+(?:\.\d+)?)/);
+    while (powerMatches && stepCount < 22) {
+        const base = parseFloat(powerMatches[1]);
+        const exp = parseFloat(powerMatches[2]);
+        const powVal = Math.pow(base, exp);
+        stepCount++;
+        const formattedPow = Number(powVal.toFixed(8)).toString();
+        current = current.replace(powerMatches[0], formattedPow);
+        steps.push({
+            title: 'Evaluate Exponentiation',
+            math: `${powerMatches[0]} = ${formattedPow}`,
+            explanation: `Compute base ${powerMatches[1]} raised to exponent ${powerMatches[2]}: ${powerMatches[0]} = ${formattedPow}. Expression reduces to: ${current}`
+        });
+        powerMatches = current.match(/(-?\d+(?:\.\d+)?)\s*\^\s*(-?\d+(?:\.\d+)?)/);
+    }
+
+    // 4. Evaluate Multiplication (*), Division (/), and Modulo (%)
+    let multDivMatches = current.match(/(-?\d+(?:\.\d+)?)\s*([*/%])\s*(-?\d+(?:\.\d+)?)/);
+    while (multDivMatches && stepCount < 30) {
+        const n1 = parseFloat(multDivMatches[1]);
+        const op = multDivMatches[2];
+        const n2 = parseFloat(multDivMatches[3]);
+        let val;
+        let opName = 'Multiplication';
+        if (op === '*') { val = n1 * n2; opName = 'Multiplication'; }
+        else if (op === '/') { val = n1 / n2; opName = 'Division'; }
+        else if (op === '%') { val = n1 % n2; opName = 'Modulo'; }
+
+        stepCount++;
+        const formattedVal = Number(val.toFixed(8)).toString();
+        current = current.replace(multDivMatches[0], formattedVal);
+        steps.push({
+            title: `Evaluate ${opName}`,
+            math: `${multDivMatches[0]} = ${formattedVal}`,
+            explanation: `Perform ${opName.toLowerCase()} from left to right: ${multDivMatches[1]} ${op} ${multDivMatches[3]} = ${formattedVal}. Expression reduces to: ${current}`
+        });
+        multDivMatches = current.match(/(-?\d+(?:\.\d+)?)\s*([*/%])\s*(-?\d+(?:\.\d+)?)/);
+    }
+
+    // 5. Evaluate Addition (+) and Subtraction (-)
+    let addSubMatches = current.match(/(-?\d+(?:\.\d+)?)\s*([+-])\s*(\d+(?:\.\d+)?)/);
+    while (addSubMatches && stepCount < 38) {
+        if (addSubMatches.index === 0 && !addSubMatches[1]) break;
+        const n1 = parseFloat(addSubMatches[1]);
+        const op = addSubMatches[2];
+        const n2 = parseFloat(addSubMatches[3]);
+        const val = op === '+' ? n1 + n2 : n1 - n2;
+        stepCount++;
+        const formattedVal = Number(val.toFixed(8)).toString();
+        current = current.replace(addSubMatches[0], formattedVal);
+        steps.push({
+            title: `Evaluate ${op === '+' ? 'Addition' : 'Subtraction'}`,
+            math: `${addSubMatches[0]} = ${formattedVal}`,
+            explanation: `Perform ${op === '+' ? 'addition' : 'subtraction'}: ${addSubMatches[1]} ${op} ${addSubMatches[3]} = ${formattedVal}. Expression reduces to: ${current}`
+        });
+        addSubMatches = current.match(/(-?\d+(?:\.\d+)?)\s*([+-])\s*(\d+(?:\.\d+)?)/);
+    }
+
+    steps.push({
+        title: 'Final Result',
+        math: `${expr} = ${finalResult !== undefined ? finalResult : current}`,
+        explanation: 'All arithmetic operations completed according to precedence rules.'
+    });
+
+    return steps;
+}
+
+// Render steps into target DOM container
+function renderSolutionSteps(steps, targetContainerId = 'solutionStepsBody', countBadgeId = 'stepsCountBadge') {
+    const container = document.getElementById(targetContainerId);
+    if (!container) return;
+
+    if (!steps || steps.length === 0) {
+        container.innerHTML = '<p class="steps-empty">No solution steps available.</p>';
+        const badge = document.getElementById(countBadgeId);
+        if (badge) badge.textContent = '0 steps';
+        return;
+    }
+
+    const countBadge = document.getElementById(countBadgeId);
+    if (countBadge) {
+        countBadge.textContent = `${steps.length} ${steps.length === 1 ? 'step' : 'steps'}`;
+    }
+
+    const stepsHTML = steps.map((step, idx) => `
+        <div class="step-card">
+            <div class="step-number">${idx + 1}</div>
+            <div class="step-content">
+                <div class="step-heading">${escapeHTML(step.title || `Step ${idx + 1}`)}</div>
+                ${step.math ? `<div class="step-math">${escapeHTML(step.math)}</div>` : ''}
+                ${step.explanation ? `<div class="step-explanation">${escapeHTML(step.explanation)}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = `<div class="steps-timeline">${stepsHTML}</div>`;
+}
+
+// Toggle collapsible solution steps card
+function toggleSolutionStepsCard() {
+    const body = document.getElementById('solutionStepsBody');
+    const chevron = document.getElementById('stepsToggleChevron');
+    if (!body) return;
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        if (chevron) chevron.className = 'fas fa-chevron-up';
+    } else {
+        body.style.display = 'none';
+        if (chevron) chevron.className = 'fas fa-chevron-down';
+    }
+}
+
+// View solution steps for a specific calculation from history
+function viewHistorySteps(index) {
+    const item = history[index];
+    if (!item || !item.steps || item.steps.length === 0) return;
+    if (currentMode !== 'basic' && currentMode !== 'advanced') {
+        switchMode('basic');
+    }
+    renderSolutionSteps(item.steps, 'solutionStepsBody', 'stepsCountBadge');
+    const stepsCard = document.getElementById('solutionStepsCard');
+    if (stepsCard) {
+        stepsCard.style.display = 'block';
+        const body = document.getElementById('solutionStepsBody');
+        if (body) body.style.display = 'block';
+        const chevron = document.getElementById('stepsToggleChevron');
+        if (chevron) chevron.className = 'fas fa-chevron-up';
+        stepsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
 // Basic operations with PEMDAS operator precedence & precision formatting
 function calculate() {
     let fullExpr = '';
@@ -459,8 +698,20 @@ function calculate() {
         if (isNaN(evaluated)) throw new Error('Invalid calculation');
         
         const formatted = formatResult(evaluated);
-        addToHistory(fullExpr, formatted);
+        const steps = generateArithmeticSteps(fullExpr, formatted);
+        addToHistory(fullExpr, formatted, steps);
         
+        // Render step-by-step breakdown
+        renderSolutionSteps(steps, 'solutionStepsBody', 'stepsCountBadge');
+        const stepsCard = document.getElementById('solutionStepsCard');
+        if (stepsCard) {
+            stepsCard.style.display = 'block';
+            const body = document.getElementById('solutionStepsBody');
+            if (body) body.style.display = 'block';
+            const chevron = document.getElementById('stepsToggleChevron');
+            if (chevron) chevron.className = 'fas fa-chevron-up';
+        }
+
         currentInput = formatted;
         expressionChain = '';
         previousInput = '';
@@ -481,6 +732,10 @@ function clearAll() {
     expressionChain = '';
     previousInput = '';
     operation = null;
+    const stepsCard = document.getElementById('solutionStepsCard');
+    if (stepsCard) {
+        stepsCard.style.display = 'none';
+    }
     updateDisplay();
 }
 
@@ -716,16 +971,34 @@ function calculateDerivative() {
         const derivative = math.derivative(expr, variable);
         let resultText = `<strong>d/d${escapeHTML(variable)} [${escapeHTML(input)}] = ${escapeHTML(derivative.toString())}</strong>`;
         
+        const steps = [
+            {
+                title: 'Problem Formulation',
+                math: `f(${variable}) = ${input}`,
+                explanation: `Identify independent variable '${variable}' and function f(${variable}) to differentiate.`
+            },
+            {
+                title: 'Symbolic Differentiation',
+                math: `d/d${variable} [${input}] = ${derivative.toString()}`,
+                explanation: 'Apply calculus differentiation rules (Power Rule, Product Rule, Quotient Rule, Chain Rule) to obtain the analytical derivative.'
+            }
+        ];
+
         if (point !== '') {
             const pointVal = parseFloat(point);
             if (!isNaN(pointVal)) {
                 const scope = { [variable]: pointVal };
                 const value = derivative.evaluate(scope);
                 resultText += `<br><br>At ${escapeHTML(variable)} = ${pointVal}: <strong>${Number(value).toFixed(6)}</strong>`;
+                steps.push({
+                    title: `Point Evaluation at ${variable} = ${pointVal}`,
+                    math: `f'(${pointVal}) = ${Number(value).toFixed(6)}`,
+                    explanation: `Substitute ${variable} = ${pointVal} into the derivative function to determine the instantaneous rate of change (tangent slope).`
+                });
             }
         }
         
-        resultDiv.innerHTML = resultText;
+        resultDiv.innerHTML = resultText + formatStepsTimelineHTML(steps);
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
     }
@@ -790,10 +1063,39 @@ function calculateIntegral() {
         
         const result = sign * (h / 3) * sum;
         
+        const steps = [
+            {
+                title: 'Problem Formulation',
+                math: `∫ [${input}] d${variable} from ${lower} to ${upper}`,
+                explanation: `Definite integral problem on the interval [${lower}, ${upper}] with respect to variable '${variable}'.`
+            },
+            {
+                title: 'Check Boundary Points',
+                math: `f(${lower}) = ${fLower.toFixed(6)},  f(${upper}) = ${fUpper.toFixed(6)}`,
+                explanation: `Verify that the integrand is finite and continuous at the boundary points [${lower}, ${upper}].`
+            },
+            {
+                title: "Discretization (Simpson's 1/3 Rule)",
+                math: `n = ${n} subintervals, step size h = (b - a)/n = (${upper} - ${lower})/${n} = ${h.toFixed(6)}`,
+                explanation: "Discretize the continuous integral domain into an even number of subintervals using composite Simpson's 1/3 rule for fourth-order accuracy."
+            },
+            {
+                title: 'Composite Quadrature Sum',
+                math: `S = f(x_0) + 4 ∑ f(x_odd) + 2 ∑ f(x_even) + f(x_n)`,
+                explanation: `Evaluate alternating parity-weighted function values across all ${n - 1} interior quadrature nodes.`
+            },
+            {
+                title: 'Final Numerical Evaluation',
+                math: `∫_${lower}^${upper} (${input}) d${variable} ≈ ${result.toFixed(6)}`,
+                explanation: `Multiply composite sum by (h / 3)${sign === -1 ? ' with sign correction due to swapped bounds' : ''} to obtain final value.`
+            }
+        ];
+
         resultDiv.innerHTML = `
             <strong>∫ ${escapeHTML(input)} d${escapeHTML(variable)} from ${escapeHTML(sign === -1 ? upper : lower)} to ${escapeHTML(sign === -1 ? lower : upper)}</strong>
             <br><br>
             Result: <strong>${result.toFixed(6)}</strong>
+            ${formatStepsTimelineHTML(steps)}
         `;
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
@@ -878,15 +1180,33 @@ function solveEquation() {
         
         foundRoots.sort((a, b) => a - b);
         
+        const steps = [
+            {
+                title: 'Transform to Standard Form',
+                math: `f(${variable}) = ${expr} = 0`,
+                explanation: `Rearrange input equation '${input}' into standard root-finding format f(${variable}) = 0.`
+            },
+            {
+                title: 'Newton-Raphson Numerical Iteration',
+                math: `x_{n+1} = x_n - \\frac{f(x_n)}{f'(x_n)}`,
+                explanation: 'Apply gradient-guided Newton-Raphson multi-start iterations with dynamic step descent.'
+            },
+            {
+                title: 'Convergence & Verification',
+                math: foundRoots.length > 0 ? `Roots verified: ${foundRoots.map(r => `${variable} ≈ ${r}`).join(', ')}` : 'No real roots converged within search range',
+                explanation: 'Candidate roots are checked against error tolerance |f(x)| < 1e-8 to ensure mathematical precision.'
+            }
+        ];
+
         if (foundRoots.length > 0) {
             let rootsHTML = `<strong>Solution${foundRoots.length > 1 ? 's' : ''}:</strong><br><br>`;
             foundRoots.forEach((root, idx) => {
                 const verif = evalF(root);
                 rootsHTML += `${escapeHTML(variable)}${foundRoots.length > 1 ? `<sub>${idx + 1}</sub>` : ''} ≈ <strong>${root.toFixed(6)}</strong> <small>(f ≈ ${verif.toExponential(2)})</small><br>`;
             });
-            resultDiv.innerHTML = rootsHTML;
+            resultDiv.innerHTML = rootsHTML + formatStepsTimelineHTML(steps);
         } else {
-            resultDiv.innerHTML = `<span style="color: var(--warning)">No real solutions found in domain [-50, 50]. The equation may have complex roots or no solution.</span>`;
+            resultDiv.innerHTML = `<span style="color: var(--warning)">No real solutions found in domain [-50, 50]. The equation may have complex roots or no solution.</span>` + formatStepsTimelineHTML(steps);
         }
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
@@ -894,10 +1214,11 @@ function solveEquation() {
 }
 
 // History functions
-function addToHistory(expression, result) {
+function addToHistory(expression, result, steps = []) {
     const historyItem = {
         expression: expression,
         result: result,
+        steps: steps || [],
         timestamp: new Date().toLocaleTimeString()
     };
     
@@ -918,9 +1239,16 @@ function renderHistory() {
     }
     
     historyList.innerHTML = history.map((item, index) => `
-        <div class="history-item" onclick="loadFromHistory(${index})">
-            <div class="history-expression">${escapeHTML(item.expression)}</div>
-            <div class="history-result">= ${escapeHTML(item.result)}</div>
+        <div class="history-item">
+            <div style="cursor: pointer;" onclick="loadFromHistory(${index})">
+                <div class="history-expression">${escapeHTML(item.expression)}</div>
+                <div class="history-result">= ${escapeHTML(item.result)}</div>
+            </div>
+            ${item.steps && item.steps.length > 0 ? `
+                <button class="history-item-steps-btn" onclick="event.stopPropagation(); viewHistorySteps(${index})" title="View Solution Steps">
+                    <i class="fas fa-list-ol"></i> Solution Steps (${item.steps.length})
+                </button>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -1118,12 +1446,31 @@ function calculatePermutation() {
     try {
         const result = permutation(n, r);
         const formula = `P(${n},${r}) = ${n}! / (${n}-${r})! = ${n}! / ${n-r}!`;
+
+        const permSteps = [
+            {
+                title: 'Permutation Formula Definition',
+                math: `P(n, r) = \\frac{n!}{(n - r)!}`,
+                explanation: `Calculate ordered arrangements of ${r} items selected from a collection of ${n} distinct items.`
+            },
+            {
+                title: 'Substitute Parameters',
+                math: `P(${n}, ${r}) = \\frac{${n}!}{( ${n} - ${r} )!} = \\frac{${n}!}{( ${n - r} )!}`,
+                explanation: `Insert values n = ${n} and r = ${r} into the factorial formula.`
+            },
+            {
+                title: 'Factorial Cancellation & Product',
+                math: `P(${n}, ${r}) = ${result.toLocaleString()}`,
+                explanation: `Cancel (${n - r})! from numerator and denominator to produce final permutations count.`
+            }
+        ];
         
         resultDiv.innerHTML = `
             <strong>Permutation Formula:</strong><br>
             ${formula}<br><br>
             <strong>Result:</strong> <span style="color: var(--success); font-size: 1.2em;">${result.toLocaleString()}</span><br><br>
             <small>This represents the number of ways to arrange ${r} items from ${n} total items where order matters.</small>
+            ${formatStepsTimelineHTML(permSteps)}
         `;
         
         addToHistory(`P(${n},${r})`, result);
@@ -1146,12 +1493,31 @@ function calculateCombination() {
     try {
         const result = combination(n, r);
         const formula = `C(${n},${r}) = ${n}! / (${r}! × (${n}-${r})!) = ${n}! / (${r}! × ${n-r}!)`;
+
+        const combSteps = [
+            {
+                title: 'Combination Formula Definition',
+                math: `C(n, r) = \\binom{n}{r} = \\frac{n!}{r! \\cdot (n - r)!}`,
+                explanation: `Calculate unordered subsets of ${r} items chosen from a set of ${n} distinct items.`
+            },
+            {
+                title: 'Substitute Parameters',
+                math: `C(${n}, ${r}) = \\frac{${n}!}{${r}! \\cdot (${n} - ${r})!} = \\frac{${n}!}{${r}! \\cdot ${n - r}!}`,
+                explanation: `Insert values n = ${n} and r = ${r} into the combination formula.`
+            },
+            {
+                title: 'Factorial Evaluation',
+                math: `C(${n}, ${r}) = ${result.toLocaleString()}`,
+                explanation: `Divide the permutation product by r! to eliminate order dependencies.`
+            }
+        ];
         
         resultDiv.innerHTML = `
             <strong>Combination Formula:</strong><br>
             ${formula}<br><br>
             <strong>Result:</strong> <span style="color: var(--success); font-size: 1.2em;">${result.toLocaleString()}</span><br><br>
             <small>This represents the number of ways to choose ${r} items from ${n} total items where order doesn't matter.</small>
+            ${formatStepsTimelineHTML(combSteps)}
         `;
         
         addToHistory(`C(${n},${r})`, result);
@@ -3119,6 +3485,43 @@ function multiplyMatrices() {
     
     try {
         const result = matrixMultiply(matrixA, matrixB);
+        const rowsA = matrixA.length;
+        const colsA = matrixA[0].length;
+        const rowsB = matrixB.length;
+        const colsB = matrixB[0].length;
+
+        let sampleDot = '';
+        if (colsA > 0 && rowsB > 0) {
+            const terms = [];
+            for (let k = 0; k < Math.min(colsA, 3); k++) {
+                terms.push(`(${matrixA[0][k]} × ${matrixB[k][0]})`);
+            }
+            if (colsA > 3) terms.push('...');
+            sampleDot = `C_{1,1} = ${terms.join(' + ')} = ${result[0][0]}`;
+        }
+
+        const matrixSteps = [
+            {
+                title: 'Check Matrix Compatibility',
+                math: `A(${rowsA} × ${colsA}) × B(${rowsB} × ${colsB}) → C(${rowsA} × ${colsB})`,
+                explanation: `Multiplication is valid because columns of Matrix A (${colsA}) match rows of Matrix B (${rowsB}). Product dimensions are ${rowsA} × ${colsB}.`
+            },
+            {
+                title: 'Row-Column Dot Product Formula',
+                math: `C_{i,j} = \\sum_{k=1}^{${colsA}} A_{i,k} \\cdot B_{k,j}`,
+                explanation: 'Each entry C(i, j) in the product matrix is the inner dot product of Row i from Matrix A and Column j from Matrix B.'
+            },
+            {
+                title: 'Sample Calculation (Entry C₁,₁)',
+                math: sampleDot || `C_{1,1} = ${result[0][0]}`,
+                explanation: 'Multiply corresponding elements of Row 1 from Matrix A with Column 1 from Matrix B and sum them.'
+            },
+            {
+                title: 'Construct Final Result Matrix',
+                math: `Computed ${rowsA} × ${colsB} product entries`,
+                explanation: 'Repeat inner products across all rows and columns to complete the product matrix.'
+            }
+        ];
         
         resultDiv.innerHTML = `
             <strong>Matrix Multiplication: A × B</strong><br><br>
@@ -3138,6 +3541,7 @@ function multiplyMatrices() {
                     ${formatMatrix(result)}
                 </div>
             </div>
+            ${formatStepsTimelineHTML(matrixSteps)}
         `;
         
         addToHistory('A × B', 'calculated');
@@ -5927,8 +6331,26 @@ function displayPolynomialSolution(polynomial, roots, resultDiv) {
     }
     
     resultHTML += `<br><small>Roots are values of x where the polynomial equals zero</small>`;
+
+    const polySteps = [
+        {
+            title: 'Standard Polynomial Form',
+            math: `${polynomialStr} = 0`,
+            explanation: `Identify polynomial equation of degree ${degree} with leading coefficient ${coefficients[0]}.`
+        },
+        {
+            title: 'Algebraic Resolution Method',
+            math: degree === 1 ? 'Linear formula: x = -b / a' : degree === 2 ? 'Quadratic formula: x = (-b ± √(b² - 4ac)) / (2a)' : `Degree ${degree}: Numerical companion matrix factorization & deflation`,
+            explanation: degree === 1 ? 'Direct linear inverse solution.' : degree === 2 ? 'Evaluate discriminant Δ = b² - 4ac to determine root character.' : 'Apply QR/companion matrix factorization to solve all complex and real roots.'
+        },
+        {
+            title: 'Fundamental Theorem of Algebra',
+            math: `Degree ${degree} → Exactly ${degree} root(s) counting multiplicities`,
+            explanation: `The polynomial equation has ${roots.length} computed root(s) satisfying P(x) = 0.`
+        }
+    ];
     
-    resultDiv.innerHTML = resultHTML;
+    resultDiv.innerHTML = resultHTML + formatStepsTimelineHTML(polySteps);
 }
 
 // Format polynomial for display
@@ -8491,7 +8913,30 @@ function calculateLimit() {
             }
         }
 
-        resultDiv.innerHTML = resultHTML;
+        const limitSteps = [
+            {
+                title: 'Problem Formulation',
+                math: `lim (${variable} → ${c}) [${input}]  [Direction: ${direction}]`,
+                explanation: `Investigate behavior of function f(${variable}) as ${variable} approaches point ${c}.`
+            },
+            {
+                title: 'Left-Hand Numerical Sequence (x → c⁻)',
+                math: `x = [${c} - 10⁻², ..., ${c} - 10⁻⁷] → f(x) ≈ ${roundLim(leftLim)}`,
+                explanation: `Evaluate decreasing sequence of small offsets from the left to trace one-sided convergence.`
+            },
+            {
+                title: 'Right-Hand Numerical Sequence (x → c⁺)',
+                math: `x = [${c} + 10⁻², ..., ${c} + 10⁻⁷] → f(x) ≈ ${roundLim(rightLim)}`,
+                explanation: `Evaluate decreasing sequence of small offsets from the right to trace one-sided convergence.`
+            },
+            {
+                title: 'Limit Existence Conclusion',
+                math: direction === 'both' ? (Math.abs(leftLim - rightLim) < 1e-3 ? `lim (${variable} → ${c}) = ${roundLim((leftLim + rightLim) / 2)}` : 'Limit Does Not Exist (DNE)') : `lim (${variable} → ${c}${direction === 'left' ? '⁻' : '⁺'}) = ${direction === 'left' ? roundLim(leftLim) : roundLim(rightLim)}`,
+                explanation: direction === 'both' ? (Math.abs(leftLim - rightLim) < 1e-3 ? 'Both left-hand and right-hand limits match, confirming existence of two-sided limit.' : 'Left-hand and right-hand limits differ or diverge, so two-sided limit does not exist.') : 'Directional limit determined from approach path.'
+            }
+        ];
+
+        resultDiv.innerHTML = resultHTML + formatStepsTimelineHTML(limitSteps);
         addToHistory(`lim_{${variable}→${c}} (${input})`, direction === 'both' ? roundLim(leftLim) : (direction === 'left' ? roundLim(leftLim) : roundLim(rightLim)));
     } catch (err) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error calculating limit: ${escapeHTML(err.message)}</span>`;
@@ -8615,7 +9060,25 @@ function calculateTaylorSeries() {
         }
         resultHTML += `</ul>`;
 
-        resultDiv.innerHTML = resultHTML;
+        const taylorSteps = [
+            {
+                title: 'Taylor Series Definition',
+                math: `P_n(${variable}) = \\sum_{k=0}^{n} \\frac{f^{(k)}(c)}{k!} (${variable} - c)^k`,
+                explanation: `Approximate f(${variable}) near center point c = ${c} up to polynomial degree n = ${order}.`
+            },
+            {
+                title: 'Compute Successive Derivatives at Center',
+                math: derivatives.slice(0, 3).map(d => `f^(${d.order})(${c}) ≈ ${isNaN(d.valAtC) ? '?' : Number(d.valAtC).toFixed(3)}`).join(', ') + (derivatives.length > 3 ? '...' : ''),
+                explanation: 'Evaluate zero-th through n-th order derivatives at expansion center c to obtain polynomial coefficients.'
+            },
+            {
+                title: 'Construct Polynomial Terms',
+                math: `P_${order}(${variable}) = ${polynomialString}`,
+                explanation: `Assemble evaluated derivative coefficients divided by k! to construct final approximating polynomial.`
+            }
+        ];
+
+        resultDiv.innerHTML = resultHTML + formatStepsTimelineHTML(taylorSteps);
         addToHistory(`Taylor(${input}, c=${c}, n=${order})`, polynomialString);
     } catch (err) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error calculating Taylor series: ${escapeHTML(err.message)}</span>`;
@@ -8869,5 +9332,12 @@ window.resetCalculatorSettings = resetCalculatorSettings;
 window.openHamburgerMenu = openHamburgerMenu;
 window.closeHamburgerMenu = closeHamburgerMenu;
 window.toggleAdvancedBasicKeypad = toggleAdvancedBasicKeypad;
+
+// Export Step 12 features: solution steps engine
+window.formatStepsTimelineHTML = formatStepsTimelineHTML;
+window.generateArithmeticSteps = generateArithmeticSteps;
+window.renderSolutionSteps = renderSolutionSteps;
+window.toggleSolutionStepsCard = toggleSolutionStepsCard;
+window.viewHistorySteps = viewHistorySteps;
 
 console.log('Calculator JavaScript loaded successfully');
