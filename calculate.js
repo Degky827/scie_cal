@@ -940,14 +940,70 @@ function memorySubtract() {
     }
 }
 
-// Calculus functions using math.js
+// Automatically detect the independent variable in a mathematical expression (ignoring known functions and constants)
+function detectIndependentVariable(exprStr, preferred = 'x') {
+    if (!exprStr) return preferred;
+    let cleaned = String(exprStr).replace(/^[a-zA-Z]\s*\(\s*([a-zA-Z])\s*\)\s*=/, '');
+    if (/^[yY]\s*=/.test(cleaned)) cleaned = cleaned.replace(/^[yY]\s*=/, '');
+    const tokens = cleaned.match(/[a-zA-Z]+/g) || [];
+    const KNOWN = new Set([
+        'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sec', 'csc', 'cot',
+        'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
+        'ln', 'log', 'log10', 'log2', 'exp', 'sqrt', 'cbrt', 'abs',
+        'floor', 'ceil', 'round', 'pi', 'PI', 'e', 'E', 'd', 'dx', 'dt', 'dy'
+    ]);
+    const candidates = tokens.filter(t => !KNOWN.has(t.toLowerCase()) && !KNOWN.has(t));
+    if (candidates.includes(preferred)) return preferred;
+    if (candidates.includes('x')) return 'x';
+    if (candidates.includes('t')) return 't';
+    if (candidates.includes('y')) return 'y';
+    if (candidates.includes('u')) return 'u';
+    if (candidates.includes('z')) return 'z';
+    if (candidates.length > 0) return candidates[0];
+    return 'x';
+}
+
+// Normalize mathematical expressions for reliable parsing across math.js and numerical solvers
+function normalizeMathExpression(exprStr, variable = 'x') {
+    if (!exprStr) return '';
+    let expr = String(exprStr).trim();
+    // Strip function definitions like f(x) = ... or y = ...
+    expr = expr.replace(/^[a-zA-Z]\s*\(\s*[a-zA-Z]\s*\)\s*=\s*/, '');
+    if (/^[yY]\s*=\s*/.test(expr)) expr = expr.replace(/^[yY]\s*=\s*/, '');
+
+    // Replace typographic unicode operators
+    expr = expr.replace(/[\u2212\u2013\u2014]/g, '-');
+    expr = expr.replace(/[\u00D7\u22C5]/g, '*');
+    expr = expr.replace(/[\u00F7]/g, '/');
+
+    // Replace e^(...) or e^x with exp(...)
+    expr = expr.replace(/\be\s*\^\s*\(([^()]+)\)/gi, 'exp($1)');
+    expr = expr.replace(/\be\s*\^\s*([a-zA-Z0-9]+)/gi, 'exp($1)');
+
+    // In math.js, ln is not standard; replace ln(...) with log(...) (natural logarithm)
+    expr = expr.replace(/\bln\s*\(/g, 'log(');
+
+    // Replace log10(u) and log2(u) for calculus
+    expr = expr.replace(/\blog10\s*\(([^()]+)\)/g, '(log($1)/log(10))');
+    expr = expr.replace(/\blog2\s*\(([^()]+)\)/g, '(log($1)/log(2))');
+
+    // Implicit multiplication: number followed by letter, opening paren, or function
+    expr = expr.replace(/(\d+(?:\.\d+)?)\s*([a-zA-Z_(])/g, '$1*$2');
+    
+    // Closing paren followed by letter, opening paren, or digit
+    expr = expr.replace(/(\))\s*([a-zA-Z_\d(])/g, '$1*$2');
+
+    return expr;
+}
+
+// Calculus functions using math.js & advanced numerical engines
 function calculateDerivative() {
-    const input = document.getElementById('derivativeInput').value;
+    const rawInput = document.getElementById('derivativeInput').value;
     const point = document.getElementById('derivativePoint').value;
     const resultDiv = document.getElementById('derivativeResult');
     
-    if (!input) {
-        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter a function</span>';
+    if (!rawInput || !rawInput.trim()) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter a function f(x)</span>';
         return;
     }
     
@@ -957,70 +1013,103 @@ function calculateDerivative() {
     }
     
     try {
-        const expr = math.parse(input);
+        const input = rawInput.trim();
+        const variable = detectIndependentVariable(input);
+        const normalized = normalizeMathExpression(input, variable);
         
-        // Auto-detect variable in expression (e.g. x, t, y, u)
-        let variable = 'x';
-        if (expr.filter) {
-            const symbols = expr.filter(node => node.isSymbolNode)
-                                .map(n => n.name)
-                                .filter(n => !['pi', 'e', 'E', 'PI'].includes(n));
-            if (symbols.length > 0) variable = symbols[0];
-        }
-        
+        const expr = math.parse(normalized);
         const derivative = math.derivative(expr, variable);
-        let resultText = `<strong>d/d${escapeHTML(variable)} [${escapeHTML(input)}] = ${escapeHTML(derivative.toString())}</strong>`;
+        let simplified = derivative;
+        if (typeof math.simplify === 'function') {
+            try {
+                simplified = math.simplify(derivative);
+            } catch (se) {}
+        }
+
+        const derivStr = derivative.toString();
+        const simpStr = simplified.toString();
+
+        let resultText = `<strong>d/d${escapeHTML(variable)} [${escapeHTML(input)}] = <span class="highlight-result">${escapeHTML(simpStr)}</span></strong>`;
+        if (simpStr !== derivStr && derivStr.length < 150) {
+            resultText += `<br><small style="color: #94a3b8">Unsimplified form: ${escapeHTML(derivStr)}</small>`;
+        }
         
         const steps = [
             {
                 title: 'Problem Formulation',
                 math: `f(${variable}) = ${input}`,
                 explanation: `Identify independent variable '${variable}' and function f(${variable}) to differentiate.`
-            },
-            {
-                title: 'Symbolic Differentiation',
-                math: `d/d${variable} [${input}] = ${derivative.toString()}`,
-                explanation: 'Apply calculus differentiation rules (Power Rule, Product Rule, Quotient Rule, Chain Rule) to obtain the analytical derivative.'
             }
         ];
+
+        // Identify constituent differentiation rules
+        const rulesUsed = [];
+        if (/\b(ln|log)\b/i.test(input)) rulesUsed.push('Logarithmic Rule: d/dx[ln(u)] = u\'/u');
+        if (/\b(e\^|exp)\b/i.test(input)) rulesUsed.push('Exponential Rule: d/dx[e^u] = e^u · u\'');
+        if (/\b(sin|cos|tan|sec|csc|cot)\b/i.test(input)) rulesUsed.push('Trigonometric Rules: d/dx[sin(u)] = cos(u)·u\', d/dx[cos(u)] = -sin(u)·u\'');
+        if (/\//.test(normalized)) rulesUsed.push('Quotient Rule: d/dx[u/v] = (u\'v - uv\') / v²');
+        if (/\*/.test(normalized)) rulesUsed.push('Product Rule: d/dx[u·v] = u\'v + uv\'');
+        if (/\^/.test(normalized)) rulesUsed.push('Power & Chain Rule: d/dx[uⁿ] = n·uⁿ⁻¹·u\'');
+
+        steps.push({
+            title: 'Calculus Differentiation Rules Applied',
+            math: rulesUsed.length > 0 ? rulesUsed.join('<br>') : 'd/dx[c·xⁿ] = c·n·xⁿ⁻¹ (Power & Linearity)',
+            explanation: 'Apply analytical calculus theorems and chain rule based on the operators and functions present.'
+        });
+
+        steps.push({
+            title: 'Symbolic Derivative Result',
+            math: `f'(${variable}) = ${simpStr}`,
+            explanation: 'Evaluate the symbolic derivative and reduce terms to standard simplified mathematical notation.'
+        });
 
         if (point !== '') {
             const pointVal = parseFloat(point);
             if (!isNaN(pointVal)) {
-                const scope = { [variable]: pointVal };
-                const value = derivative.evaluate(scope);
-                resultText += `<br><br>At ${escapeHTML(variable)} = ${pointVal}: <strong>${Number(value).toFixed(6)}</strong>`;
-                steps.push({
-                    title: `Point Evaluation at ${variable} = ${pointVal}`,
-                    math: `f'(${pointVal}) = ${Number(value).toFixed(6)}`,
-                    explanation: `Substitute ${variable} = ${pointVal} into the derivative function to determine the instantaneous rate of change (tangent slope).`
-                });
+                let val1 = NaN;
+                try {
+                    val1 = derivative.evaluate({ [variable]: pointVal, [variable.toUpperCase()]: pointVal, pi: Math.PI, e: Math.E });
+                } catch (e1) {
+                    try {
+                        val1 = simplified.evaluate({ [variable]: pointVal, [variable.toUpperCase()]: pointVal, pi: Math.PI, e: Math.E });
+                    } catch (e2) {}
+                }
+                if (!isNaN(val1) && isFinite(val1)) {
+                    resultText += `<br><br>At ${escapeHTML(variable)} = ${pointVal}: Tangent slope <strong>f'(${pointVal}) = ${Number(val1).toFixed(6)}</strong>`;
+                    steps.push({
+                        title: `Point Evaluation at ${variable} = ${pointVal}`,
+                        math: `f'(${pointVal}) = ${Number(val1).toFixed(6)}`,
+                        explanation: `Substitute ${variable} = ${pointVal} into the derivative function to determine the instantaneous rate of change (tangent slope).`
+                    });
+                }
             }
         }
         
         resultDiv.innerHTML = resultText + formatStepsTimelineHTML(steps);
+        addToHistory(`d/d${variable} [${input}]`, simpStr);
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
     }
 }
 
 function calculateIntegral() {
-    const input = document.getElementById('integralInput').value;
+    const rawInput = document.getElementById('integralInput').value;
     let lower = parseFloat(document.getElementById('integralLower').value);
     let upper = parseFloat(document.getElementById('integralUpper').value);
     const resultDiv = document.getElementById('integralResult');
     
-    if (!input) {
-        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter a function</span>';
+    if (!rawInput || !rawInput.trim()) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter an integrand function f(x)</span>';
         return;
     }
     
     if (isNaN(lower) || isNaN(upper)) {
-        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter valid bounds</span>';
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter valid numerical lower and upper bounds</span>';
         return;
     }
     
     try {
+        const input = rawInput.trim();
         let sign = 1;
         if (lower > upper) {
             const tmp = lower;
@@ -1029,25 +1118,32 @@ function calculateIntegral() {
             sign = -1;
         }
         
-        const varMatch = input.match(/[a-zA-Z]/);
-        const variable = varMatch ? varMatch[0] : 'x';
+        const variable = detectIndependentVariable(input);
+        const normalized = normalizeMathExpression(input, variable);
         
         let f;
         if (typeof math !== 'undefined' && math.compile) {
-            f = math.compile(input);
+            try {
+                f = math.compile(normalized);
+            } catch (e) {}
         }
         const evalF = (val) => {
-            if (f) return f.evaluate({ [variable]: val });
-            return evaluateFunction(input, val);
+            if (f) {
+                try {
+                    const res = f.evaluate({ [variable]: val, [variable.toUpperCase()]: val, pi: Math.PI, e: Math.E });
+                    if (typeof res === 'number' && isFinite(res)) return res;
+                } catch (e) {}
+            }
+            return evaluateFunction(normalized, val, variable);
         };
         
-        const n = 1000;
+        const n = 2000;
         const h = (upper - lower) / n;
         const fLower = evalF(lower);
         const fUpper = evalF(upper);
         
         if (!isFinite(fLower) || !isFinite(fUpper)) {
-            throw new Error('Integrand is undefined or infinite at the boundary points');
+            throw new Error(`Integrand is undefined or infinite at boundary points (${variable} = ${lower} or ${upper})`);
         }
         
         let sum = fLower + fUpper;
@@ -1066,11 +1162,11 @@ function calculateIntegral() {
         const steps = [
             {
                 title: 'Problem Formulation',
-                math: `∫ [${input}] d${variable} from ${lower} to ${upper}`,
+                math: `∫ [${input}] d${variable} from ${sign === -1 ? upper : lower} to ${sign === -1 ? lower : upper}`,
                 explanation: `Definite integral problem on the interval [${lower}, ${upper}] with respect to variable '${variable}'.`
             },
             {
-                title: 'Check Boundary Points',
+                title: 'Check Boundary Points & Domain Continuity',
                 math: `f(${lower}) = ${fLower.toFixed(6)},  f(${upper}) = ${fUpper.toFixed(6)}`,
                 explanation: `Verify that the integrand is finite and continuous at the boundary points [${lower}, ${upper}].`
             },
@@ -1086,7 +1182,7 @@ function calculateIntegral() {
             },
             {
                 title: 'Final Numerical Evaluation',
-                math: `∫_${lower}^${upper} (${input}) d${variable} ≈ ${result.toFixed(6)}`,
+                math: `∫_${sign === -1 ? upper : lower}^${sign === -1 ? lower : upper} (${input}) d${variable} ≈ ${result.toFixed(6)}`,
                 explanation: `Multiply composite sum by (h / 3)${sign === -1 ? ' with sign correction due to swapped bounds' : ''} to obtain final value.`
             }
         ];
@@ -1097,116 +1193,226 @@ function calculateIntegral() {
             Result: <strong>${result.toFixed(6)}</strong>
             ${formatStepsTimelineHTML(steps)}
         `;
+        addToHistory(`∫ (${input}) d${variable}`, result.toFixed(6));
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
     }
 }
 
+// Universal Equation Solver: Solves linear, polynomial, rational, radical, logarithmic, exponential, trigonometric, and mixed equations
 function solveEquation() {
-    const input = document.getElementById('equationInput').value;
+    const rawInput = document.getElementById('equationInput').value;
     const resultDiv = document.getElementById('equationResult');
     
-    if (!input) {
-        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter an equation</span>';
+    if (!rawInput || !rawInput.trim()) {
+        resultDiv.innerHTML = '<span style="color: var(--danger)">Please enter an equation (e.g. ln(x) = 2, e^x = 10, 2x^3 - 4x = 0, sin(x) = 0.5)</span>';
         return;
     }
     
     try {
-        let equation = input.replace(/\s/g, '');
-        if (!equation.includes('=')) {
-            equation += '=0';
+        const input = rawInput.trim();
+        let eq = input;
+        if (!eq.includes('=')) {
+            eq += ' = 0';
         }
         
-        const [left, right] = equation.split('=');
-        const expr = `${left}-(${right || '0'})`;
+        const eqParts = eq.split('=');
+        const leftSide = eqParts[0].trim();
+        const rightSide = eqParts.slice(1).join('=').trim() || '0';
+        const rawExpr = `(${leftSide}) - (${rightSide})`;
         
-        const varMatch = expr.match(/[a-zA-Z]/);
-        const variable = varMatch ? varMatch[0] : 'x';
-
-        let f, df;
-        if (typeof math !== 'undefined' && typeof math.compile === 'function') {
-            f = math.compile(expr);
+        const variable = detectIndependentVariable(input);
+        const normalizedExpr = normalizeMathExpression(rawExpr, variable);
+        
+        let f = null;
+        let df = null;
+        if (typeof math !== 'undefined') {
             try {
-                df = math.derivative(math.parse(expr), variable);
-            } catch (de) {
-                df = null;
-            }
+                if (typeof math.compile === 'function') {
+                    f = math.compile(normalizedExpr);
+                }
+                if (typeof math.parse === 'function' && typeof math.derivative === 'function') {
+                    df = math.derivative(math.parse(normalizedExpr), variable);
+                }
+            } catch (me) {}
         }
         
         const evalF = (xVal) => {
-            if (f) return f.evaluate({ [variable]: xVal });
-            return evaluateFunction(expr, xVal);
+            if (f) {
+                try {
+                    const r = f.evaluate({ [variable]: xVal, [variable.toUpperCase()]: xVal, pi: Math.PI, e: Math.E });
+                    if (typeof r === 'number' && isFinite(r)) return r;
+                } catch (e) {}
+            }
+            return evaluateFunction(normalizedExpr, xVal, variable);
         };
         
         const evalDf = (xVal) => {
-            if (df) return df.evaluate({ [variable]: xVal });
-            const h = 1e-6;
-            return (evalF(xVal + h) - evalF(xVal - h)) / (2 * h);
-        };
-        
-        const starts = [-50, -20, -10, -5, -2, -1, -0.5, 0, 0.5, 1, 2, 5, 10, 20, 50];
-        const foundRoots = [];
-        const tolerance = 1e-8;
-        const maxIterations = 80;
-        
-        for (const start of starts) {
-            let x = start;
-            for (let iter = 0; iter < maxIterations; iter++) {
+            if (df) {
                 try {
-                    const fx = evalF(x);
-                    const dfx = evalDf(x);
-                    if (Math.abs(fx) < tolerance) {
-                        if (isFinite(x)) {
-                            const rounded = Math.round(x * 1e6) / 1e6;
-                            if (!foundRoots.some(r => Math.abs(r - rounded) < 1e-4)) {
-                                foundRoots.push(rounded);
-                            }
-                        }
-                        break;
-                    }
-                    if (Math.abs(dfx) < 1e-12) {
-                        x += 0.25;
-                        continue;
-                    }
-                    const step = fx / dfx;
-                    if (!isFinite(step)) break;
-                    x = x - step;
-                    if (Math.abs(x) > 1e8) break;
-                } catch (e) {
-                    break;
+                    const dr = df.evaluate({ [variable]: xVal, [variable.toUpperCase()]: xVal, pi: Math.PI, e: Math.E });
+                    if (typeof dr === 'number' && isFinite(dr)) return dr;
+                } catch (e) {}
+            }
+            const h = 1e-6;
+            const fp = evalF(xVal + h);
+            const fm = evalF(xVal - h);
+            if (isNaN(fp) || isNaN(fm)) return NaN;
+            return (fp - fm) / (2 * h);
+        };
+
+        const hasLog = /\b(log|ln)\b/i.test(input);
+        const hasSqrt = /\bsqrt\b/i.test(input);
+        const hasTrig = /\b(sin|cos|tan|sec|csc|cot)\b/i.test(input);
+        const hasExp = /\b(e\^|exp)\b/i.test(input);
+
+        // Build multi-grid: dense positive logarithmic grid for log/sqrt, dense symmetric grid for general equations
+        const grid = [];
+        if (hasLog || hasSqrt) {
+            for (let p = -5; p <= 4; p++) {
+                const base = Math.pow(10, p);
+                for (let m of [1, 2, 3, 5, 7]) {
+                    grid.push(m * base);
                 }
             }
         }
-        
+        const linearPoints = [
+            -1000, -500, -250, -100, -75, -50, -30, -20, -15, -10, -8, -6, -5, -4, -3, -2.5, -2, -1.5, -1, -0.75, -0.5, -0.25, -0.1, -0.01, -0.001,
+            0,
+            0.001, 0.01, 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50, 75, 100, 250, 500, 1000
+        ];
+        if (hasTrig) {
+            for (let k = -24; k <= 24; k++) {
+                grid.push(k * Math.PI / 6);
+                grid.push(k * Math.PI / 4);
+            }
+        }
+        for (const pt of linearPoints) {
+            if (!grid.includes(pt)) grid.push(pt);
+        }
+        grid.sort((a, b) => a - b);
+
+        const foundRoots = [];
+        const tolerance = 1e-8;
+
+        const registerRoot = (val) => {
+            if (typeof val !== 'number' || !isFinite(val) || isNaN(val)) return;
+            const err = Math.abs(evalF(val));
+            if (err > 1e-4) return; // Discard false convergence at poles or asymptotes
+            const rounded = Math.round(val * 1e6) / 1e6;
+            if (!foundRoots.some(r => Math.abs(r - rounded) < 1e-4)) {
+                foundRoots.push(rounded);
+            }
+        };
+
+        // Phase 1: Interval sign-change bracketing (Bisection Method - guaranteed convergence)
+        for (let i = 0; i < grid.length - 1; i++) {
+            const x1 = grid[i];
+            const x2 = grid[i + 1];
+            const f1 = evalF(x1);
+            const f2 = evalF(x2);
+
+            if (Math.abs(f1) < tolerance) { registerRoot(x1); continue; }
+            if (Math.abs(f2) < tolerance) { registerRoot(x2); continue; }
+
+            if (!isNaN(f1) && !isNaN(f2) && f1 * f2 < 0) {
+                if (Math.abs(f1) > 1e4 && Math.abs(f2) > 1e4) continue;
+
+                let a = x1, b = x2;
+                let fa = f1, fb = f2;
+                for (let iter = 0; iter < 60; iter++) {
+                    const mid = (a + b) / 2;
+                    const fmid = evalF(mid);
+                    if (isNaN(fmid) || Math.abs(fmid) < tolerance || (b - a) / 2 < 1e-11) {
+                        registerRoot(mid);
+                        break;
+                    }
+                    if (fa * fmid < 0) {
+                        b = mid;
+                        fb = fmid;
+                    } else {
+                        a = mid;
+                        fa = fmid;
+                    }
+                }
+            }
+        }
+
+        // Phase 2: Damped Multi-Start Newton-Raphson
+        for (const start of grid) {
+            let x = start;
+            for (let iter = 0; iter < 60; iter++) {
+                const fx = evalF(x);
+                if (isNaN(fx)) break;
+                if (Math.abs(fx) < tolerance) {
+                    registerRoot(x);
+                    break;
+                }
+                const dfx = evalDf(x);
+                if (isNaN(dfx) || Math.abs(dfx) < 1e-12) {
+                    x += 0.25;
+                    continue;
+                }
+                let step = fx / dfx;
+                if (!isFinite(step)) break;
+                if (Math.abs(step) > 20) step = Math.sign(step) * 20;
+                const nextX = x - step;
+                if (hasLog && nextX <= 0) {
+                    x = x / 2; // Keep within positive log domain
+                } else {
+                    x = nextX;
+                }
+                if (Math.abs(x) > 1e8) break;
+            }
+        }
+
         foundRoots.sort((a, b) => a - b);
-        
+
+        // Classify equation type for explanation
+        let eqnType = 'Algebraic Equation';
+        if (hasLog && hasExp) eqnType = 'Mixed Transcendental (Logarithmic & Exponential)';
+        else if (hasLog) eqnType = 'Logarithmic Equation';
+        else if (hasExp) eqnType = 'Exponential Equation';
+        else if (hasTrig) eqnType = 'Trigonometric Equation';
+        else if (/\//.test(normalizedExpr)) eqnType = 'Rational Equation';
+        else if (/\^/.test(normalizedExpr)) eqnType = 'Polynomial Equation';
+
         const steps = [
             {
                 title: 'Transform to Standard Form',
-                math: `f(${variable}) = ${expr} = 0`,
-                explanation: `Rearrange input equation '${input}' into standard root-finding format f(${variable}) = 0.`
+                math: `f(${variable}) = ${rawExpr} = 0`,
+                explanation: `Equate the left-hand side (${leftSide}) and right-hand side (${rightSide}) to form standard zero-root problem f(${variable}) = 0.`
             },
             {
-                title: 'Newton-Raphson Numerical Iteration',
-                math: `x_{n+1} = x_n - \\frac{f(x_n)}{f'(x_n)}`,
-                explanation: 'Apply gradient-guided Newton-Raphson multi-start iterations with dynamic step descent.'
+                title: 'Equation Classification & Domain',
+                math: `Type: ${eqnType} [Variable: '${variable}']`,
+                explanation: hasLog ? `Domain restricted to positive real numbers (${variable} > 0) due to logarithmic terms.` : (hasSqrt ? `Domain restricted to non-negative real numbers (${variable} ≥ 0) due to radical terms.` : `Real domain continuous search range [-1000, 1000].`)
             },
             {
-                title: 'Convergence & Verification',
-                math: foundRoots.length > 0 ? `Roots verified: ${foundRoots.map(r => `${variable} ≈ ${r}`).join(', ')}` : 'No real roots converged within search range',
-                explanation: 'Candidate roots are checked against error tolerance |f(x)| < 1e-8 to ensure mathematical precision.'
+                title: 'Multi-Grid Bracketing & Newton-Raphson Convergence',
+                math: `x_{n+1} = x_n - \\frac{f(x_n)}{f'(x_n)} \\quad \\text{and Bisection on sign-change intervals}`,
+                explanation: 'Scan multi-resolution grid for Intermediate Value Theorem sign changes, refined via Bisection and damped gradient descent.'
+            },
+            {
+                title: 'Convergence Verification & Error Tolerance',
+                math: foundRoots.length > 0 ? `Verified roots: ${foundRoots.map(r => `${variable} ≈ ${r}`).join(', ')}` : 'No real roots detected within domain bounds',
+                explanation: 'Every root candidate is evaluated against error threshold |f(x)| < 1e-4 to filter out extraneous roots and vertical poles.'
             }
         ];
 
         if (foundRoots.length > 0) {
-            let rootsHTML = `<strong>Solution${foundRoots.length > 1 ? 's' : ''}:</strong><br><br>`;
+            let rootsHTML = `<strong>Solution${foundRoots.length > 1 ? 's' : ''} for ${escapeHTML(input)}:</strong><br><br>`;
             foundRoots.forEach((root, idx) => {
                 const verif = evalF(root);
-                rootsHTML += `${escapeHTML(variable)}${foundRoots.length > 1 ? `<sub>${idx + 1}</sub>` : ''} ≈ <strong>${root.toFixed(6)}</strong> <small>(f ≈ ${verif.toExponential(2)})</small><br>`;
+                rootsHTML += `<div style="margin: 4px 0; font-size: 1.05rem;">
+                    <strong>${escapeHTML(variable)}${foundRoots.length > 1 ? `<sub>${idx + 1}</sub>` : ''} = ${root.toFixed(6)}</strong>
+                    <small style="color: #94a3b8; font-size: 0.8rem;"> (Residual: |f| ≈ ${Math.abs(verif).toExponential(2)})</small>
+                </div>`;
             });
             resultDiv.innerHTML = rootsHTML + formatStepsTimelineHTML(steps);
+            addToHistory(`Solve ${input}`, foundRoots.map(r => `${variable}=${r}`).join(', '));
         } else {
-            resultDiv.innerHTML = `<span style="color: var(--warning)">No real solutions found in domain [-50, 50]. The equation may have complex roots or no solution.</span>` + formatStepsTimelineHTML(steps);
+            resultDiv.innerHTML = `<span style="color: var(--warning)">No real solutions found in domain [-1000, 1000]. The equation may have complex roots, or no real solutions exist.</span>` + formatStepsTimelineHTML(steps);
         }
     } catch (error) {
         resultDiv.innerHTML = `<span style="color: var(--danger)">Error: ${escapeHTML(error.message)}</span>`;
@@ -7710,6 +7916,7 @@ const SAFE_MATH_IDENTIFIERS = new Set([
     'pi', 'PI', 'e', 'E',
     'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
     'sec', 'csc', 'cot',
+    'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
     'ln', 'log', 'log10', 'log2', 'exp',
     'sqrt', 'cbrt', 'abs', 'floor', 'ceil', 'round'
 ]);
@@ -7753,8 +7960,14 @@ function evaluateFunction(expression, x, variableName = 'x') {
             sec: (u) => 1 / (isDeg ? Math.cos(u * Math.PI / 180) : Math.cos(u)),
             csc: (u) => 1 / (isDeg ? Math.sin(u * Math.PI / 180) : Math.sin(u)),
             cot: (u) => 1 / (isDeg ? Math.tan(u * Math.PI / 180) : Math.tan(u)),
+            sinh: Math.sinh,
+            cosh: Math.cosh,
+            tanh: Math.tanh,
+            asinh: Math.asinh || ((u) => Math.log(u + Math.sqrt(u * u + 1))),
+            acosh: Math.acosh || ((u) => Math.log(u + Math.sqrt(u * u - 1))),
+            atanh: Math.atanh || ((u) => 0.5 * Math.log((1 + u) / (1 - u))),
             ln: Math.log,
-            log: Math.log10,
+            log: Math.log,
             log10: Math.log10,
             log2: Math.log2,
             exp: Math.exp,
@@ -8851,21 +9064,24 @@ function calculateLimit() {
     }
 
     try {
-        const varMatch = input.match(/[a-zA-Z]/);
-        const variable = varMatch ? varMatch[0] : 'x';
+        const variable = detectIndependentVariable(input);
+        const normalized = normalizeMathExpression(input, variable);
 
         let compiledFn = null;
         if (typeof math !== 'undefined' && typeof math.compile === 'function') {
             try {
-                compiledFn = math.compile(input);
+                compiledFn = math.compile(normalized);
             } catch (ce) {}
         }
 
         const evalF = (xVal) => {
             if (compiledFn) {
-                return compiledFn.evaluate({ [variable]: xVal });
+                try {
+                    const r = compiledFn.evaluate({ [variable]: xVal, [variable.toUpperCase()]: xVal, pi: Math.PI, e: Math.E });
+                    if (typeof r === 'number' && isFinite(r)) return r;
+                } catch (e) {}
             }
-            return evaluateFunction(input, xVal);
+            return evaluateFunction(normalized, xVal, variable);
         };
 
         const steps = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7];
@@ -8959,13 +9175,13 @@ function calculateTaylorSeries() {
     const order = Math.min(6, Math.max(1, parseInt(orderStr) || 4));
 
     try {
-        const varMatch = input.match(/[a-zA-Z]/);
-        const variable = varMatch ? varMatch[0] : 'x';
+        const variable = detectIndependentVariable(input);
+        const normalized = normalizeMathExpression(input, variable);
 
         let parsedExpr = null;
         if (typeof math !== 'undefined' && typeof math.parse === 'function') {
             try {
-                parsedExpr = math.parse(input);
+                parsedExpr = math.parse(normalized);
             } catch (pe) {}
         }
 
@@ -9339,5 +9555,9 @@ window.generateArithmeticSteps = generateArithmeticSteps;
 window.renderSolutionSteps = renderSolutionSteps;
 window.toggleSolutionStepsCard = toggleSolutionStepsCard;
 window.viewHistorySteps = viewHistorySteps;
+
+// Export Step 13 features: Universal Equation Solver & Advanced Calculus
+window.detectIndependentVariable = detectIndependentVariable;
+window.normalizeMathExpression = normalizeMathExpression;
 
 console.log('Calculator JavaScript loaded successfully');

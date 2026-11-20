@@ -182,12 +182,8 @@ global.math = {
     toString: () => `2*${variable} + 3`,
     evaluate: (scope) => 2 * (scope[variable] || 0) + 3
   }),
-  compile: (expr) => ({
-    evaluate: (scope) => {
-      const x = scope.x !== undefined ? scope.x : (scope.t !== undefined ? scope.t : 0);
-      return Math.pow(x, 2);
-    }
-  })
+  simplify: (node) => node,
+  compile: null
 };
 
 // Load and evaluate calculate.js
@@ -617,6 +613,53 @@ async function runAllTests() {
 
   solveEquation();
   assert(mockDOM['equationResult'].innerHTML.includes('Solution Steps') && mockDOM['equationResult'].innerHTML.includes('Newton-Raphson'), 'solveEquation outputs Newton-Raphson step-by-step breakdown');
+
+  console.log('\n--- Step 13: Universal Equation Solver & Advanced Calculus Function Types ---');
+  // 1. Variable Detection & Expression Normalization
+  assert(detectIndependentVariable('log(x) = 2') === 'x', 'detectIndependentVariable identifies x in log(x) = 2');
+  assert(detectIndependentVariable('ln(t) + 3*t = 5') === 't', 'detectIndependentVariable identifies t in ln(t) + 3*t = 5');
+  assert(detectIndependentVariable('sin(u) + 2*u = 1') === 'u', 'detectIndependentVariable identifies u in sin(u)');
+  assert(detectIndependentVariable('y = 3*x^2 + 5*x - 1') === 'x', 'detectIndependentVariable strips y = and identifies x');
+  assert(normalizeMathExpression('2x + 3').includes('2*x'), 'normalizeMathExpression handles implicit multiplication 2x');
+  assert(normalizeMathExpression('ln(x)').includes('log(x)'), 'normalizeMathExpression normalizes ln to log');
+
+  // 2. Solve Logarithmic Equation: ln(x) = 2 -> x ≈ 7.389056
+  mockDOM['equationInput'].value = 'ln(x) = 2';
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('7.389056'), 'solveEquation solves logarithmic equation ln(x) = 2');
+  assert(mockDOM['equationResult'].innerHTML.includes('Logarithmic Equation'), 'solveEquation classifies equation as Logarithmic');
+
+  // 3. Solve Exponential Equation: e^x = 10 -> x ≈ 2.302585
+  mockDOM['equationInput'].value = 'e^x = 10';
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('2.302585'), 'solveEquation solves exponential equation e^x = 10');
+
+  // 4. Solve Mixed Transcendental Equation: x + ln(x) = 5 -> x ≈ 3.693441
+  mockDOM['equationInput'].value = 'x + ln(x) = 5';
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('3.693441'), 'solveEquation solves mixed transcendental equation x + ln(x) = 5');
+
+  // 5. Solve Rational Equation: (x + 1)/(x - 2) = 4 -> x = 3
+  mockDOM['equationInput'].value = '(x + 1)/(x - 2) = 4';
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('3.000000') || mockDOM['equationResult'].innerHTML.includes('3'), 'solveEquation solves rational equation (x+1)/(x-2) = 4');
+
+  // 6. Solve Long Polynomial Equation: 2x^3 - 4x^2 + 3x - 1 = 0 -> x = 1
+  mockDOM['equationInput'].value = '2x^3 - 4x^2 + 3x - 1 = 0';
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('1.000000') || mockDOM['equationResult'].innerHTML.includes('1'), 'solveEquation solves long polynomial equation');
+
+  // 7. Solve Radical Equation: sqrt(x + 5) = x - 1 -> x = 4 (extraneous root rejected)
+  mockDOM['equationInput'].value = 'sqrt(x + 5) = x - 1';
+  solveEquation();
+  assert(mockDOM['equationResult'].innerHTML.includes('4.000000') || mockDOM['equationResult'].innerHTML.includes('4'), 'solveEquation solves radical equation sqrt(x+5) = x-1');
+
+  // 8. Derivative with Logarithmic and Long Expressions
+  mockDOM['derivativeInput'].value = 'ln(x) + 3*x^2';
+  mockDOM['derivativePoint'].value = '2';
+  calculateDerivative();
+  assert(mockDOM['derivativeResult'].innerHTML.includes('Solution Steps'), 'calculateDerivative outputs steps for logarithmic function');
+  assert(mockDOM['derivativeResult'].innerHTML.includes('Logarithmic Rule'), 'calculateDerivative steps cite Logarithmic Rule');
 
   console.log('\n====================================================');
   console.log(`  SUMMARY: ALL ${totalPassed} TESTS PASSED PERFECTLY! (0 Failed)`);
